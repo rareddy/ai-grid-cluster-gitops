@@ -56,8 +56,8 @@ spec:
               # which rhoai-prerequisites' Policy creates.
               modelsNamespace: ai-grid-internal-models
     # What the chart doesn't hold: ACM Search access for the backend.
-    - repoURL: https://github.com/ai-grid-cloud/ai-grid-cluster-gitops.git
-      targetRevision: HEAD
+    - repoURL: https://github.com/rareddy/ai-grid-tenant.git
+      targetRevision: main
       path: apps/console/manifests
   destination:
     server: https://kubernetes.default.svc
