@@ -20,7 +20,7 @@ spec:
     spec:
       project: default
       source:
-        repoURL: https://github.com/rareddy/ai-grid-tenant.git
+        repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
         targetRevision: main
         path: apps/acm/submariner
         helm:

@@ -11,7 +11,7 @@ spec:
     preserveResourcesOnDeletion: false
   generators:
     - git:
-        repoURL: https://github.com/rareddy/ai-grid-tenant.git
+        repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
         revision: main
         files:
           - path: apps/*/application.yaml

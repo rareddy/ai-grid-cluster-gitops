@@ -25,8 +25,8 @@ check() {
       END {exit bad}' "$f" || bad=1
   done < <(sources)
   # No other copy of this repository is named anywhere.
-  stray=$(grep -rnE --include='*.yaml' 'repoURL:[[:space:]]*\S*ai-grid-tenant' . | grep -vF "repoURL: $current" || true)
-  [[ -z $stray ]] || { echo "error: sources name another tenant repository:" >&2; echo "$stray" >&2; bad=1; }
+  stray=$(grep -rnE --include='*.yaml' 'repoURL:[[:space:]]*\S*(ai-grid-tenant|ai-grid-cluster-gitops)(\.git)?([[:space:]]|$)' . | grep -vF "repoURL: $current" || true)
+  [[ -z $stray ]] || { echo "error: sources name another cluster GitOps repository:" >&2; echo "$stray" >&2; bad=1; }
   ((bad == 0)) && echo "ok: $(sources | wc -l) files point at $current"
   return "$bad"
 }

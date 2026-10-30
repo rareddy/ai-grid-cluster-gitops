@@ -21,7 +21,7 @@ spec:
     spec:
       project: default
       sources:
-        - repoURL: https://github.com/rareddy/ai-grid-tenant.git
+        - repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
           targetRevision: main
           path: cluster-config/chart
           helm:
@@ -31,7 +31,7 @@ spec:
             parameters:
               - name: hubResources.enabled
                 value: '{{ eq .name "local-cluster" | toString }}'
-        - repoURL: https://github.com/rareddy/ai-grid-tenant.git
+        - repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
           targetRevision: main
           ref: values
       destination:

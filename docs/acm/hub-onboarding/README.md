@@ -7,9 +7,9 @@ How a cluster becomes a Grid site on v0.3.0-rc.3, under Local membership with AC
 Argo CD runs on the hub and installs everything else from the tenant repo, ACM included. Argo syncs from git, so run it from your own fork. Point the fork's Argo sources at itself, once, and push:
 
 ```bash
-git clone https://github.com/<you>/ai-grid-tenant.git
-cd ai-grid-tenant
-scripts/set-tenant-repo.sh https://github.com/<you>/ai-grid-tenant.git main
+git clone https://github.com/<you>/ai-grid-cluster-gitops.git
+cd ai-grid-cluster-gitops
+scripts/set-tenant-repo.sh https://github.com/<you>/ai-grid-cluster-gitops.git main
 git commit -am "Point Argo at this fork" && git push
 ```
 
@@ -164,7 +164,7 @@ flowchart TD
 * Grid, v0.3.0-rc.2: https://github.com/praxis-proxy/grid/tree/v0.3.0-rc.2
 * grid-enrollment chart: https://github.com/praxis-proxy/grid/tree/v0.3.0-rc.2/charts/grid-enrollment
 * Vendored chart the lab installs: https://github.com/opendatahub-io/odh-gitops/tree/feature-ai-grid/charts/rhai-on-openshift-chart/charts/grid-enrollment
-* Lab tenant: https://github.com/ai-grid-cloud/ai-grid-cluster-gitops
-* Argo bootstrap: https://github.com/ai-grid-cloud/ai-grid-cluster-gitops/blob/main/bootstrap.sh
-* ACM manifests: https://github.com/ai-grid-cloud/ai-grid-cluster-gitops/tree/main/apps/acm/manifests
-* Hub values: https://github.com/ai-grid-cloud/ai-grid-cluster-gitops/blob/main/apps/grid-bootstrap/values.yaml
+* Cluster GitOps: https://github.com/rareddy/ai-grid-cluster-gitops
+* Argo bootstrap: https://github.com/rareddy/ai-grid-cluster-gitops/blob/main/bootstrap.sh
+* ACM manifests: https://github.com/rareddy/ai-grid-cluster-gitops/tree/main/apps/acm/manifests
+* Hub values: https://github.com/rareddy/ai-grid-cluster-gitops/blob/main/apps/grid-bootstrap/values.yaml

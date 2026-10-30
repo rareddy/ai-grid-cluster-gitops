@@ -47,7 +47,7 @@ spec:
     spec:
       project: default
       sources:
-        - repoURL: https://github.com/rareddy/ai-grid-tenant.git
+        - repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
           targetRevision: main
           ref: values
         # Temporary v0.3.0-rc.2 schemas until the RHOAI manifest bundle catches up.
@@ -82,12 +82,12 @@ spec:
               - name: dependencies.loki.olm.createNamespace
                 value: '{{ ne (index .metadata.labels "local-cluster") "true" | toString }}'
         # The enrollment service runs on the hub, so a managed cluster excludes these.
-        - repoURL: https://github.com/rareddy/ai-grid-tenant.git
+        - repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
           targetRevision: main
           path: apps/rhoai/local-cluster
           directory:
             exclude: '{{ if eq (index .metadata.labels "local-cluster") "true" }}{{ else }}*{{ end }}'
-        - repoURL: https://github.com/rareddy/ai-grid-tenant.git
+        - repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
           targetRevision: main
           path: apps/rhoai/catalog
           helm:

@@ -1,7 +1,7 @@
 module.exports = {
   platform: 'github',
   repositories: [
-    'ai-grid-cloud/ai-grid-cluster-gitops'
+    'rareddy/ai-grid-cluster-gitops'
   ],
   hostRules: [
     {
