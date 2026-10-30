@@ -38,7 +38,7 @@ spec:
       project: default
       sources:
         - repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
-          targetRevision: main
+          targetRevision: aws-osd
           ref: values
         - repoURL: https://github.com/opendatahub-io/odh-gitops.git
           targetRevision: feature-ai-grid

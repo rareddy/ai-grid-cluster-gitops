@@ -14,7 +14,7 @@ spec:
   generators:
     - git:
         repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
-        revision: main
+        revision: aws-osd
         files:
           - path: apps/acm/application.yaml
           - path: apps/acm-models/application.yaml

@@ -10,7 +10,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
-    targetRevision: main
+    targetRevision: aws-osd
     path: apps/maas-home/hub
   # maas-db, created untracked, holds the rhoai app's tenant RBAC Role; this
   # app's own objects name the maas-home namespace.

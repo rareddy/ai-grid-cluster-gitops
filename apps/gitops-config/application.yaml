@@ -9,7 +9,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
-    targetRevision: main
+    targetRevision: aws-osd
     path: apps/gitops-config/manifests
   destination:
     server: https://kubernetes.default.svc

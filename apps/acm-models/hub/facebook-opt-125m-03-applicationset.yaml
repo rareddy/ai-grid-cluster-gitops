@@ -27,7 +27,7 @@ spec:
       project: default
       source:
         repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
-        targetRevision: main
+        targetRevision: aws-osd
         path: apps/acm-models/facebook-opt-125m
       destination:
         server: '{{.server}}'

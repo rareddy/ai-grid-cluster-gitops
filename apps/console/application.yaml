@@ -57,7 +57,7 @@ spec:
               modelsNamespace: ai-grid-internal-models
     # What the chart doesn't hold: ACM Search access for the backend.
     - repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
-      targetRevision: main
+      targetRevision: aws-osd
       path: apps/console/manifests
   destination:
     server: https://kubernetes.default.svc

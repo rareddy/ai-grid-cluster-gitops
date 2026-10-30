@@ -21,7 +21,7 @@ spec:
       project: default
       source:
         repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
-        targetRevision: main
+        targetRevision: aws-osd
         path: apps/acm/submariner
         helm:
           releaseName: acm-submariner
