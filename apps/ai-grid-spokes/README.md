@@ -100,6 +100,8 @@ Policies in other apps select the same sites: the tenant Policy
 config and the grid `ExternalProvider`) and `maas-db`'s credentials go to
 sites with role ingress or combined.
 `rhoai-prerequisites` (with the model namespace and its NetworkPolicies, the
-image mirror and the pull secret, and its `rhoai-limitador-redis` Policy on
-every cluster but the hub), Submariner, the sample models and Argo CD's cluster
-registration still go to every managed cluster, site or not.
+image mirror and the pull secret), Submariner, the sample models and Argo CD's
+cluster registration still go to every managed cluster, site or not. The
+`rhoai-limitador-redis` Policy selects enabled remote ingress and combined
+sites, excluding the hub and dedicated MaaS-home sites; inference-only sites
+do not need shared MaaS counters.

@@ -22,7 +22,15 @@ spec:
   predicates:
     - requiredClusterSelector:
         labelSelector:
+          matchLabels:
+            ai-grid/enabled: "true"
           matchExpressions:
+            # Shared MaaS counters belong only to consumer-facing sites.
+            - key: ai-grid/role
+              operator: In
+              values:
+                - ingress
+                - combined
             - key: name
               operator: NotIn
               values:

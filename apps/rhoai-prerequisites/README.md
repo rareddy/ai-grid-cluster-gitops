@@ -58,7 +58,7 @@ policies still distribute registry credentials on both cluster types.
 ## Shared Limitador Redis
 
 `apps/limitador-redis` owns the Redis instance and its local Limitador storage
-configuration on `local-cluster`. On every other managed cluster, the
+configuration on `local-cluster`. On enabled remote ingress and combined sites, the
 `rhoai-limitador-redis` Policy creates the `limitador-redis` namespace needed
 for the Submariner `ServiceImport`, the `kuadrant-system/limitador-redis`
 Secret, and the `Limitador/limitador` Redis storage reference. Remote
@@ -69,9 +69,9 @@ redis://limitador-redis-master.limitador-redis.svc.clusterset.local:6379
 ```
 
 The local Redis NetworkPolicy permits Submariner GlobalNet traffic
-(`242.0.0.0/8`). The policy intentionally excludes `local-cluster` so the
-existing local Argo Application remains the sole owner of the Redis and local
-Limitador storage resources.
+(`242.0.0.0/8`). The policy excludes inference-only and unselected clusters, which do not run
+MaaS. It also excludes `local-cluster` and dedicated MaaS-home sites because
+their local Applications own Redis and the Limitador storage configuration.
 
 ## Create the hub Secret
 
