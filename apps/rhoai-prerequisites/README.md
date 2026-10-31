@@ -40,6 +40,21 @@ Secret is applied only as `quay.io/rhoai`, so the cluster's own `quay.io` login
 stays. Updating that Secret triggers the normal Machine Config
 Operator rollout to each node.
 
+## Hosted control planes
+
+On clusters whose Infrastructure reports `controlPlaneTopology: External`,
+configure the four digest-mirror mappings through the managed-service API
+(for ROSA HCP, `rosa create image-mirror`). The image-mirror policy uses an
+unnamed object template on these clusters: ACM evaluates unnamed templates in
+inform mode, checking for an ImageDigestMirrorSet with all four mappings
+without creating or updating it. It does not require the `quay-registry` name
+or `NeverContactSource`, which the ROSA CLI does not expose. Missing mappings
+remain NonCompliant. Ordinary clusters keep the named mirror enforcement.
+
+Mirror pruning is disabled so policy transitions and removal preserve
+service-managed and administrator-managed mirror resources. Pull-secret
+policies still distribute registry credentials on both cluster types.
+
 ## Shared Limitador Redis
 
 `apps/limitador-redis` owns the Redis instance and its local Limitador storage
