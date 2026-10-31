@@ -1,0 +1,39 @@
+# Temporary hub workaround: the pinned Grid payload needs EndpointSlice
+# permissions absent from the deployed AI Gateway operator RBAC.
+# Remove once the operator bundle supplies these permissions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ai-gateway-grid-endpointslices
+  namespace: redhat-ai-grid
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+rules:
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    resourceNames:
+      - grid-operator-signals-holder
+      - grid-operator-swim-holder
+    verbs: ["get", "update"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["create", "delete"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices/restricted"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ai-gateway-grid-endpointslices
+  namespace: redhat-ai-grid
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ai-gateway-grid-endpointslices
+subjects:
+  - kind: ServiceAccount
+    name: ai-gateway-operator
+    namespace: redhat-ods-applications
