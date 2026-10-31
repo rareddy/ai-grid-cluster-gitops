@@ -55,6 +55,18 @@ Mirror pruning is disabled so policy transitions and removal preserve
 service-managed and administrator-managed mirror resources. Pull-secret
 policies still distribute registry credentials on both cluster types.
 
+## Credentials for source-referenced mirrored images
+
+The distributed catalog pull Secret includes narrowly scoped credential aliases:
+`registry.redhat.io/rhoai` uses the Quay credential, and the three
+`registry.redhat.io/rhaii*` prefixes use the stage credential when supplied.
+Kubelet selects credentials for the requested source image before CRI-O
+redirects the pull to a mirror. A mirror-only credential can therefore pull
+the Quay catalog but fail to authenticate a source-referenced operator bundle
+on HCP, where updating the guest global pull Secret does not supply node
+credentials. Existing registry entries are preserved; the four configured
+mirror source prefixes use their matching mirror credentials.
+
 ## Shared Limitador Redis
 
 `apps/limitador-redis` owns the Redis instance and its local Limitador storage

@@ -255,6 +255,22 @@ spec:
           object-templates-raw: |
             {{hub- if (lookup "v1" "Secret" "rhoai-prerequisites" "rhoai-quay-pull-secret") hub}}
             {{hub- if (fromSecret "rhoai-prerequisites" "rhoai-quay-pull-secret" ".dockerconfigjson") hub}}
+            {{hub- $pullConfig := fromSecret "rhoai-prerequisites" "rhoai-quay-pull-secret" ".dockerconfigjson" | base64dec | fromJson hub}}
+            {{hub- $auths := index $pullConfig "auths" hub}}
+            {{hub- $quayAuth := index $auths "quay.io/rhoai" hub}}
+            {{hub- if not $quayAuth hub}}
+            {{hub- $quayAuth = index $auths "quay.io" hub}}
+            {{hub- end hub}}
+            {{hub- /* Kubelet selects pull credentials by the requested source image, before CRI-O redirects to its mirror. HCP does not use the guest global pull Secret as node credentials. */ -hub}}
+            {{hub- if $quayAuth hub}}
+            {{hub- $_ := set $auths "registry.redhat.io/rhoai" $quayAuth hub}}
+            {{hub- end hub}}
+            {{hub- $stageAuth := index $auths "registry.stage.redhat.io" hub}}
+            {{hub- if $stageAuth hub}}
+            {{hub- range $repo := list "rhaii" "rhaii-early-access" "rhaii-fast" hub}}
+            {{hub- $_ := set $auths (printf "registry.redhat.io/%s" $repo) $stageAuth hub}}
+            {{hub- end hub}}
+            {{hub- end hub}}
             - complianceType: musthave
               objectDefinition:
                 apiVersion: v1
@@ -264,7 +280,7 @@ spec:
                   namespace: openshift-marketplace
                 type: kubernetes.io/dockerconfigjson
                 data:
-                  .dockerconfigjson: '{{hub fromSecret "rhoai-prerequisites" "rhoai-quay-pull-secret" ".dockerconfigjson" hub}}'
+                  .dockerconfigjson: '{{hub $pullConfig | toJson | base64enc hub}}'
             {{hub- end hub}}
             {{hub- end hub}}
     - objectDefinition:
