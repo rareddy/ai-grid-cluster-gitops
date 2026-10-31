@@ -194,6 +194,11 @@ spec:
                   - kind: ServiceAccount
                     name: grid-model-client
                     namespace: redhat-ai-grid
+                  # The pinned model controller delegates this permission to
+                  # per-model identities and must hold it in this namespace.
+                  - kind: ServiceAccount
+                    name: odh-model-controller
+                    namespace: redhat-ods-applications
 
     - objectDefinition:
         apiVersion: policy.open-cluster-management.io/v1

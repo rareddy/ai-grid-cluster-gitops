@@ -90,6 +90,17 @@ permissions it currently lacks. The hub remains owned by its existing Argo
 manifest; this policy does not manage its Role or RoleBinding. Remove both
 workarounds when the AI Gateway operator bundle supplies these permissions.
 
+## Model publisher delegation
+
+In namespaces opted in with `grid.opendatahub.io/allowed=true`, the existing
+`grid-model-client-models` RoleBinding also grants the pinned
+`redhat-ods-applications/odh-model-controller` ServiceAccount `post` on
+`serving.opendatahub.io/models`. The controller must hold this permission to
+delegate a model's publisher path to its generated identity; Kubernetes
+otherwise rejects creation of the per-model Role. No additional verbs or
+cluster-wide grant are needed. Remove this workaround when shipped operator
+RBAC supplies the required namespace permissions.
+
 ## Shared Limitador Redis
 
 `apps/limitador-redis` owns the Redis instance and its local Limitador storage
