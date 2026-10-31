@@ -255,22 +255,6 @@ spec:
           object-templates-raw: |
             {{hub- if (lookup "v1" "Secret" "rhoai-prerequisites" "rhoai-quay-pull-secret") hub}}
             {{hub- if (fromSecret "rhoai-prerequisites" "rhoai-quay-pull-secret" ".dockerconfigjson") hub}}
-            {{hub- $pullConfig := fromSecret "rhoai-prerequisites" "rhoai-quay-pull-secret" ".dockerconfigjson" | base64dec | fromJson hub}}
-            {{hub- $auths := index $pullConfig "auths" hub}}
-            {{hub- $quayAuth := index $auths "quay.io/rhoai" hub}}
-            {{hub- if not $quayAuth hub}}
-            {{hub- $quayAuth = index $auths "quay.io" hub}}
-            {{hub- end hub}}
-            {{hub- /* Kubelet selects pull credentials by the requested source image, before CRI-O redirects to its mirror. HCP does not use the guest global pull Secret as node credentials. */ -hub}}
-            {{hub- if $quayAuth hub}}
-            {{hub- $_ := set $auths "registry.redhat.io/rhoai" $quayAuth hub}}
-            {{hub- end hub}}
-            {{hub- $stageAuth := index $auths "registry.stage.redhat.io" hub}}
-            {{hub- if $stageAuth hub}}
-            {{hub- range $repo := list "rhaii" "rhaii-early-access" "rhaii-fast" hub}}
-            {{hub- $_ := set $auths (printf "registry.redhat.io/%s" $repo) $stageAuth hub}}
-            {{hub- end hub}}
-            {{hub- end hub}}
             - complianceType: musthave
               objectDefinition:
                 apiVersion: v1
@@ -280,7 +264,7 @@ spec:
                   namespace: openshift-marketplace
                 type: kubernetes.io/dockerconfigjson
                 data:
-                  .dockerconfigjson: '{{hub $pullConfig | toJson | base64enc hub}}'
+                  .dockerconfigjson: '{{hub fromSecret "rhoai-prerequisites" "rhoai-quay-pull-secret" ".dockerconfigjson" hub}}'
             {{hub- end hub}}
             {{hub- end hub}}
     - objectDefinition:
@@ -293,10 +277,22 @@ spec:
           severity: high
           object-templates-raw: |
             {{- $sourceSecret := lookup "v1" "Secret" "openshift-marketplace" "rhoai-catalog-pull-secret" -}}
-            {{- $globalSecret := lookup "v1" "Secret" "openshift-config" "pull-secret" -}}
-            {{- if and $sourceSecret $globalSecret -}}
+            {{- $infra := lookup "config.openshift.io/v1" "Infrastructure" "" "cluster" -}}
+            {{- $hcp := eq $infra.status.controlPlaneTopology "External" -}}
+            {{- $targetNamespace := "openshift-config" -}}
+            {{- $targetName := "pull-secret" -}}
+            {{- if $hcp -}}
+            {{- /* HCCO merges this Secret and its syncer supplies node registry credentials. */ -}}
+            {{- $targetNamespace = "kube-system" -}}
+            {{- $targetName = "additional-pull-secret" -}}
+            {{- end -}}
+            {{- $globalSecret := lookup "v1" "Secret" $targetNamespace $targetName -}}
+            {{- if and $sourceSecret (or $hcp $globalSecret) -}}
             {{- $sourceConfig := fromSecret "openshift-marketplace" "rhoai-catalog-pull-secret" ".dockerconfigjson" | base64dec | fromJson -}}
-            {{- $globalConfig := fromSecret "openshift-config" "pull-secret" ".dockerconfigjson" | base64dec | fromJson -}}
+            {{- $globalConfig := dict "auths" (dict) -}}
+            {{- if $globalSecret -}}
+            {{- $globalConfig = fromSecret $targetNamespace $targetName ".dockerconfigjson" | base64dec | fromJson -}}
+            {{- end -}}
             {{- $sourceAuths := index $sourceConfig "auths" -}}
             {{- $sourceAuth := index $sourceAuths "quay.io/rhoai" -}}
             {{- if not $sourceAuth -}}
@@ -314,8 +310,8 @@ spec:
                 apiVersion: v1
                 kind: Secret
                 metadata:
-                  name: pull-secret
-                  namespace: openshift-config
+                  name: '{{ $targetName }}'
+                  namespace: '{{ $targetNamespace }}'
                 type: kubernetes.io/dockerconfigjson
                 data:
                   .dockerconfigjson: '{{ $mergedConfig | toJson | base64enc }}'

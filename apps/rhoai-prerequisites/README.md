@@ -37,8 +37,9 @@ The global pull-secret policy is idempotent. It reads the current
 adds the hub-side entries it lacks: `quay.io/rhoai` from the Quay credential,
 and any other registry the hub Secret holds. A bare `quay.io` entry in the hub
 Secret is applied only as `quay.io/rhoai`, so the cluster's own `quay.io` login
-stays. Updating that Secret triggers the normal Machine Config
-Operator rollout to each node.
+stays. On ordinary control planes, updating that Secret triggers the normal
+Machine Config Operator rollout to each node. HCP uses the separate mechanism
+below.
 
 ## Hosted control planes
 
@@ -55,17 +56,29 @@ Mirror pruning is disabled so policy transitions and removal preserve
 service-managed and administrator-managed mirror resources. Pull-secret
 policies still distribute registry credentials on both cluster types.
 
-## Credentials for source-referenced mirrored images
+## Node credentials on hosted control planes
 
-The distributed catalog pull Secret includes narrowly scoped credential aliases:
-`registry.redhat.io/rhoai` uses the Quay credential, and the three
-`registry.redhat.io/rhaii*` prefixes use the stage credential when supplied.
-Kubelet selects credentials for the requested source image before CRI-O
-redirects the pull to a mirror. A mirror-only credential can therefore pull
-the Quay catalog but fail to authenticate a source-referenced operator bundle
-on HCP, where updating the guest global pull Secret does not supply node
-credentials. Existing registry entries are preserved; the four configured
-mirror source prefixes use their matching mirror credentials.
+On HCP, the global pull-secret policy targets
+`kube-system/additional-pull-secret` instead of `openshift-config/pull-secret`.
+It merges the hub registry entries with any existing additional credentials,
+scoping the Quay entry to `quay.io/rhoai`. HCCO merges the additional Secret
+with the original HostedCluster pull secret; `global-pull-secret-syncer`
+updates registry credentials on eligible workers and restarts kubelet when
+credentials change. HCCO gives the original credentials precedence on exact
+registry-key conflicts.
+
+This requires HCP's global pull-secret feature and eligible workers. Verify
+`kube-system/global-pull-secret-syncer` is Ready and covers all target workers.
+On AWS Replace NodePools, eligible nodes have
+`hypershift.openshift.io/nodepool-globalps-enabled=true`. See the
+[HyperShift 4.22 procedure](https://github.com/openshift/hypershift/blob/release-4.22/docs/content/how-to/common/global-pull-secret.md).
+
+Keep mirror credentials under their actual registry names. The image runtime
+intentionally drops source credentials when redirecting to another registry
+hostname; source aliases cannot replace node-level mirror authentication.
+The catalog Secret is distributed unchanged from the hub credential input.
+The policy preserves the original HostedCluster Secret and does not prune
+previously managed pull Secrets.
 
 ## Shared Limitador Redis
 
