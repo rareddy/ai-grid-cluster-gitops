@@ -54,7 +54,8 @@ spec:
         targetRevision: aws-osd
         path: '{{ if eq .name "local-cluster" }}apps/maas-db/local-cluster{{ else }}apps/maas-db/read-clusters{{ end }}'
       destination:
-        server: '{{.server}}'
+        # Use the hub API directly; remote sites retain their ACM proxy endpoint.
+        server: '{{ if eq .name "local-cluster" }}https://kubernetes.default.svc{{ else }}{{ .server }}{{ end }}'
         namespace: maas-db
       syncPolicy:
         automated:

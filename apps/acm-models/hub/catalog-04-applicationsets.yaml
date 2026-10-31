@@ -48,7 +48,8 @@ spec:
         path: '{{.path.path}}'
         kustomize: {}
       destination:
-        server: '{{.server}}'
+        # Use the hub API directly; remote sites retain their ACM proxy endpoint.
+        server: '{{ if eq .name "local-cluster" }}https://kubernetes.default.svc{{ else }}{{ .server }}{{ end }}'
         namespace: ai-grid-internal-models
       syncPolicy:
         # allowEmpty: Argo CD otherwise refuses to prune to nothing.
@@ -115,7 +116,8 @@ spec:
         path: '{{.path.path}}'
         kustomize: {}
       destination:
-        server: '{{.server}}'
+        # Use the hub API directly; remote sites retain their ACM proxy endpoint.
+        server: '{{ if eq .name "local-cluster" }}https://kubernetes.default.svc{{ else }}{{ .server }}{{ end }}'
         namespace: models-as-a-service
       syncPolicy:
         # allowEmpty: Argo CD otherwise refuses to prune to nothing.
@@ -182,7 +184,8 @@ spec:
         directory:
           include: "*.yaml"
       destination:
-        server: '{{.server}}'
+        # Use the hub API directly; remote sites retain their ACM proxy endpoint.
+        server: '{{ if eq .name "local-cluster" }}https://kubernetes.default.svc{{ else }}{{ .server }}{{ end }}'
         namespace: models-as-a-service
       syncPolicy:
         # allowEmpty: Argo CD otherwise refuses to prune to nothing.

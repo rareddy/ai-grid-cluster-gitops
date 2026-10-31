@@ -30,7 +30,8 @@ spec:
         targetRevision: aws-osd
         path: apps/acm-models/facebook-opt-125m
       destination:
-        server: '{{.server}}'
+        # Use the hub API directly; remote sites retain their ACM proxy endpoint.
+        server: '{{ if eq .name "local-cluster" }}https://kubernetes.default.svc{{ else }}{{ .server }}{{ end }}'
         namespace: models-as-a-service
       syncPolicy:
         automated:
