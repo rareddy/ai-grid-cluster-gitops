@@ -9,6 +9,15 @@ The sample model goes to AI Grid sites where models run (Placement
 (`ai-grid-ingress`); both Placements are `apps/ai-grid-spokes`'. An unlabelled
 hub gets neither.
 
+## Catalog ownership
+
+Deploy new models through the provider console and its catalog repository.
+The `facebook-opt-125m/` manifest is an inactive example; no ApplicationSet
+deploys it. Its sample MaaS entries and subscription references are removed
+so a catalog model can use that name without conflicting Argo ownership,
+once the previous sample Applications and workloads finish deletion.
+The separately named SmolLM2 sample is unchanged.
+
 ## Scheduler metrics
 
 The Gateway's serving configuration enables `publishMetrics: true`, so the

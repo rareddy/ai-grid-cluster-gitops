@@ -13,25 +13,3 @@ metadata:
     argocd.argoproj.io/sync-wave: "6"
 spec:
   gridNetworkRef: grid
----
-# clusterName is the candidate's cluster, and matches the backend the consumer
-# gateway declares for this peer.
-apiVersion: grid.praxis.fast/v1alpha1
-kind: InferenceProvider
-metadata:
-  name: peer-ai-grid-2-opt-125m
-  annotations:
-    argocd.argoproj.io/sync-wave: "6"
-spec:
-  gridNetworkRef: grid
-  providerKind: vllm
-  backendKind: local_model
-  clusterName: peer-ai-grid-2
-  endpoint: https://ai-grid-2.apps.ai-grid-2-pool-mk8j5.aws.rh-ods.com:443/v1
-  siteSelector:
-    matchLabels:
-      grid.hexfusion.io/declared-peer: "true"
-  models:
-    - name: facebook-opt-125m
-      capabilities:
-        - text_generation
