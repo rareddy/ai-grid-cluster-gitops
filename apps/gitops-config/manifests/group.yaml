@@ -3,6 +3,7 @@ kind: Group
 metadata:
   name: cluster-admins
 users:
+  - rareddy
   - admin
   - khowell
   - aballant
