@@ -316,6 +316,68 @@ spec:
                 data:
                   .dockerconfigjson: '{{ $mergedConfig | toJson | base64enc }}'
             {{- end -}}
+    # Temporary remote-site counterpart of rhoai/hub/00-grid-endpointslice-rbac.yaml.
+    # Remove both workarounds once the AI Gateway bundle grants these permissions.
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: rhoai-grid-endpointslice-rbac
+        spec:
+          remediationAction: enforce
+          severity: high
+          object-templates-raw: |
+            {{hub- $cluster := lookup "cluster.open-cluster-management.io/v1" "ManagedCluster" "" .ManagedClusterName hub}}
+            {{hub- $labels := $cluster.metadata.labels hub}}
+            {{hub- $role := index $labels "ai-grid/role" hub}}
+            {{hub- if and (eq (index $labels "ai-grid/enabled") "true") (ne (index $labels "local-cluster") "true") (or (eq $role "ingress") (eq $role "inference") (eq $role "combined")) hub}}
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: rbac.authorization.k8s.io/v1
+                kind: Role
+                metadata:
+                  name: ai-gateway-grid-endpointslices
+                  namespace: redhat-ai-grid
+                rules:
+                  - apiGroups:
+                      - discovery.k8s.io
+                    resources:
+                      - endpointslices
+                    resourceNames:
+                      - grid-operator-signals-holder
+                      - grid-operator-swim-holder
+                    verbs:
+                      - get
+                      - update
+                  - apiGroups:
+                      - discovery.k8s.io
+                    resources:
+                      - endpointslices
+                    verbs:
+                      - create
+                      - delete
+                  - apiGroups:
+                      - discovery.k8s.io
+                    resources:
+                      - endpointslices/restricted
+                    verbs:
+                      - create
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: rbac.authorization.k8s.io/v1
+                kind: RoleBinding
+                metadata:
+                  name: ai-gateway-grid-endpointslices
+                  namespace: redhat-ai-grid
+                roleRef:
+                  apiGroup: rbac.authorization.k8s.io
+                  kind: Role
+                  name: ai-gateway-grid-endpointslices
+                subjects:
+                  - kind: ServiceAccount
+                    name: ai-gateway-operator
+                    namespace: redhat-ods-applications
+            {{hub- end hub}}
     # The service CA as a Secret: the grid gateway's upstreamCA and the operator's
     # deriveTopology.transport.caSecretRef take a Secret, and the platform injects the
     # CA only as a ConfigMap. Lets the gateway verify the RHOAI serving gateway's cert.

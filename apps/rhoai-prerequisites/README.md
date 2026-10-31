@@ -80,6 +80,16 @@ The catalog Secret is distributed unchanged from the hub credential input.
 The policy preserves the original HostedCluster Secret and does not prune
 previously managed pull Secrets.
 
+## Temporary Grid EndpointSlice RBAC
+
+Enabled remote sites with role ingress, inference or combined receive the same
+namespace-scoped EndpointSlice Role and RoleBinding as the temporary hub
+workaround in `apps/rhoai/hub/00-grid-endpointslice-rbac.yaml`. They let
+`redhat-ods-applications/ai-gateway-operator` delegate the Grid leader-election
+permissions it currently lacks. The hub remains owned by its existing Argo
+manifest; this policy does not manage its Role or RoleBinding. Remove both
+workarounds when the AI Gateway operator bundle supplies these permissions.
+
 ## Shared Limitador Redis
 
 `apps/limitador-redis` owns the Redis instance and its local Limitador storage
