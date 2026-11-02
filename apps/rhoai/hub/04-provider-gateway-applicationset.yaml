@@ -1,9 +1,9 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  # One provider gateway per site where models run (the ai-grid-inference
-  # Placement: role inference or combined), from one values file: the operator's
-  # provider file supplies the backends and the admitted peers.
+  # Every Grid member needs a provider endpoint for Local membership, including
+  # ingress sites with no local models. ai-grid-spokes selects enabled sites
+  # with a recognized role; a dedicated management hub remains excluded.
   name: grid-provider-gateway
   namespace: openshift-gitops
   annotations:
@@ -23,7 +23,7 @@ spec:
               configMapRef: acm-placement
               labelSelector:
                 matchLabels:
-                  cluster.open-cluster-management.io/placement: ai-grid-inference
+                  cluster.open-cluster-management.io/placement: ai-grid-spokes
               requeueAfterSeconds: 60
           - clusters:
               selector:
