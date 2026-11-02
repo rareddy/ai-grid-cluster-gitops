@@ -54,6 +54,6 @@ spec:
     {{- $_ := set $spec.source "directory" (dict "include" "{facebook-opt-125m-03-applicationset.yaml,maas-03-applicationset.yaml}") }}
     {{- end }}
     {{- if eq .metadata.name "rhoai" }}
-    {{- $_ := set $spec.source "directory" (dict "exclude" "00-managed-cluster-set-binding-grid.yaml") }}
+    {{- $_ := set $spec.source "directory" (dict "exclude" "{00-managed-cluster-set-binding-grid.yaml,00-tenant-keycloak-route-rbac.yaml}") }}
     {{- end }}
     spec: {{ $spec | toJson }}
