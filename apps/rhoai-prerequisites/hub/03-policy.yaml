@@ -262,10 +262,22 @@ spec:
           severity: high
           object-templates-raw: |
             {{- $sourceSecret := lookup "v1" "Secret" "openshift-marketplace" "rhoai-catalog-pull-secret" -}}
-            {{- $globalSecret := lookup "v1" "Secret" "openshift-config" "pull-secret" -}}
-            {{- if and $sourceSecret $globalSecret -}}
+            {{- $infra := lookup "config.openshift.io/v1" "Infrastructure" "" "cluster" -}}
+            {{- $hcp := eq $infra.status.controlPlaneTopology "External" -}}
+            {{- $targetNamespace := "openshift-config" -}}
+            {{- $targetName := "pull-secret" -}}
+            {{- if $hcp -}}
+            {{- /* HCCO merges this Secret and its syncer supplies node registry credentials. */ -}}
+            {{- $targetNamespace = "kube-system" -}}
+            {{- $targetName = "additional-pull-secret" -}}
+            {{- end -}}
+            {{- $globalSecret := lookup "v1" "Secret" $targetNamespace $targetName -}}
+            {{- if and $sourceSecret (or $hcp $globalSecret) -}}
             {{- $sourceConfig := fromSecret "openshift-marketplace" "rhoai-catalog-pull-secret" ".dockerconfigjson" | base64dec | fromJson -}}
-            {{- $globalConfig := fromSecret "openshift-config" "pull-secret" ".dockerconfigjson" | base64dec | fromJson -}}
+            {{- $globalConfig := dict "auths" (dict) -}}
+            {{- if $globalSecret -}}
+            {{- $globalConfig = fromSecret $targetNamespace $targetName ".dockerconfigjson" | base64dec | fromJson -}}
+            {{- end -}}
             {{- $sourceAuths := index $sourceConfig "auths" -}}
             {{- $sourceAuth := index $sourceAuths "quay.io/rhoai" -}}
             {{- if not $sourceAuth -}}
@@ -283,8 +295,8 @@ spec:
                 apiVersion: v1
                 kind: Secret
                 metadata:
-                  name: pull-secret
-                  namespace: openshift-config
+                  name: '{{ $targetName }}'
+                  namespace: '{{ $targetNamespace }}'
                 type: kubernetes.io/dockerconfigjson
                 data:
                   .dockerconfigjson: '{{ $mergedConfig | toJson | base64enc }}'
