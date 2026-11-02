@@ -13,8 +13,8 @@ spec:
     preserveResourcesOnDeletion: false
   generators:
     - git:
-        repoURL: https://github.com/ai-grid-cloud/ai-grid-cluster-gitops.git
-        revision: HEAD
+        repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
+        revision: e2e
         files:
           - path: apps/acm/application.yaml
           - path: apps/acm-models/application.yaml

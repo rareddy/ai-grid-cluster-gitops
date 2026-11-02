@@ -26,8 +26,8 @@ spec:
     spec:
       project: default
       source:
-        repoURL: https://github.com/ai-grid-cloud/ai-grid-cluster-gitops.git
-        targetRevision: HEAD
+        repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
+        targetRevision: e2e
         path: apps/acm-models/facebook-opt-125m
       destination:
         server: '{{.server}}'

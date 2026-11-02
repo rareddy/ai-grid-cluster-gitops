@@ -7,6 +7,7 @@
 # resource name (lowercase alphanumeric, '-', or '.'); IdP-qualified names
 # such as "user@domain" need a sanitized binding-name scheme first.
 cluster_admins:
+  - rareddy
   - khowell
   - aballant
   - lphiri
