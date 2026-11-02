@@ -15,10 +15,6 @@ operator:
           # Grid v0.3.0-rc.3 operator from the release on ghcr, until RHDS ships rc.3.
           - name: RELATED_IMAGE_ODH_PRAXIS_AI_GRID_OPERATOR_IMAGE
             value: ghcr.io/praxis-proxy/grid-operator@sha256:f3810434f13577d9940e25196b2bf37ba81c26765c5781d4679515814d7bdd22
-          # ODH KServe build of opendatahub-io/kserve#2128 (EPP metrics over TLS) at
-          # 27a1755, until the RHOAI 3.6 payload carries it.
-          - name: RELATED_IMAGE_ODH_KSERVE_LLMISVC_CONTROLLER_IMAGE
-            value: quay.io/opendatahub/odh-kserve-llmisvc-controller@sha256:69d54ad4c94726d5a0eca8202ba5820b70ea0bfa55f7998b440966dbd566f0a6
           # ODH model controller at ee3dcb8 (odh-model-controller#999: the Role grants the
           # publisher path it dials), to prove the grid-model-client-models binding in
           # rhoai-prerequisites can go; until the RHOAI 3.6 payload carries it.
