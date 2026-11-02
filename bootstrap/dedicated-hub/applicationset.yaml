@@ -21,6 +21,7 @@ spec:
           - path: apps/ai-grid-policies/application.yaml
           - path: apps/ai-grid-spokes/application.yaml
           - path: apps/cert-manager/application.yaml
+          - path: apps/console/application.yaml
           - path: apps/gitops-config/application.yaml
           - path: apps/grid-bootstrap/application.yaml
           - path: apps/maas-home/application.yaml
@@ -38,8 +39,9 @@ spec:
         namespace: '{{.spec.destination.namespace}}'
   # ACM observability needs object storage and Submariner needs a site. A new
   # grid generates its CA, and grid-bootstrap binds global in place of the rhoai
-  # app's binding. acm-models brings only the sample model: argo-registration
-  # registers clusters here, and the console catalog is the combined hub's.
+  # app's binding. acm-models delivers samples and the console catalog;
+  # argo-registration alone registers clusters. The console can use
+  # Keycloak on the MaaS-home spoke via create-secrets.sh.
   templatePatch: |
     {{- $spec := .spec }}
     {{- if eq .metadata.name "acm" }}
@@ -51,7 +53,7 @@ spec:
     {{- end }}{{ end }}
     {{- end }}
     {{- if eq .metadata.name "acm-models" }}
-    {{- $_ := set $spec.source "directory" (dict "include" "{facebook-opt-125m-03-applicationset.yaml,maas-03-applicationset.yaml}") }}
+    {{- $_ := set $spec.source "directory" (dict "include" "{facebook-opt-125m-03-applicationset.yaml,maas-03-applicationset.yaml,catalog-03-appprojects.yaml,catalog-04-applicationsets.yaml}") }}
     {{- end }}
     {{- if eq .metadata.name "rhoai" }}
     {{- $_ := set $spec.source "directory" (dict "exclude" "{00-managed-cluster-set-binding-grid.yaml,00-tenant-keycloak-route-rbac.yaml}") }}

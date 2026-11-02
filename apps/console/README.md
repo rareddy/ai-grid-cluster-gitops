@@ -21,7 +21,7 @@ on the hub, installed from its Helm chart: one pod with kube-auth-proxy
   managed cluster's indexed resources: more than the GPU nodes it asks for, so
   the backend stays behind the console's sign-in (the file says why).
 - **Models and subscriptions:** commits to the catalog repository,
-  [ai-grid-cloud/ai-grid-1-catalog](https://github.com/ai-grid-cloud/ai-grid-1-catalog),
+  [rareddy/ai-grid-catalog](https://github.com/rareddy/ai-grid-catalog),
   which `apps/acm-models` delivers and `apps/ai-grid-policies` reports on.
   That URL is the one value another environment changes, here
   (`backend.git.url`) and in `apps/acm-models/hub/catalog-*`.
@@ -62,6 +62,27 @@ creates or updates, keeping existing values:
 
 Then it restarts the console. Sign in with an OpenShift login that may patch
 ManagedClusters.
+
+## Dedicated hub with Keycloak on the MaaS-home spoke
+
+The dedicated root includes the console and catalog delivery.
+The console signs provider admins in through the hub's OpenShift OAuth; its
+Organizations backend connects to the MaaS-home spoke's public Keycloak Route.
+
+After the console Route exists, run with both kubeconfig contexts:
+
+```sh
+HUB_CONTEXT=<hub-context> \
+KEYCLOAK_CONTEXT=<maas-home-context> \
+AI_GRID_GIT_TOKEN_FILE=/path/to/catalog-token \
+apps/console/create-secrets.sh
+```
+
+The operator needs hub administrator access and permission to read the
+Keycloak Route and `maas-db/keycloak-secrets` on the MaaS-home spoke. Only those
+Keycloak reads use `KEYCLOAK_CONTEXT`; Kubernetes writes stay on `HUB_CONTEXT`.
+If `KEYCLOAK_CONTEXT` is unset, it uses the hub context, preserving combined-hub
+setup. Both the operator and console backend must reach the Keycloak Route.
 
 ## Who can change what
 

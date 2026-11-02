@@ -24,10 +24,12 @@ Create or update the provider console's Secrets and OAuthClient on the hub.
 Required environment:
   AI_GRID_GIT_TOKEN_FILE  Path to a file holding a fine-grained GitHub token
                           with contents: write on the catalog repository
-                          (ai-grid-cloud/ai-grid-1-catalog) and nothing else.
+                          configured in application.yaml and nothing else.
 
 Optional environment:
   HUB_CONTEXT             Hub kubeconfig context.
+  KEYCLOAK_CONTEXT        Keycloak kubeconfig context; defaults to HUB_CONTEXT
+                          (or the current context when HUB_CONTEXT is unset).
   NAMESPACE               The console's namespace; defaults to ai-grid-provider-console.
   KEYCLOAK_REALM          The realm whose organizations the console manages;
                           defaults to saas.
@@ -61,6 +63,11 @@ if [ -n "$context" ]; then
   kubectl_args+=(--context "$context")
 fi
 k() { kubectl "${kubectl_args[@]}" "$@"; }
+keycloak_kubectl_args=("${kubectl_args[@]}")
+if [ -n "${KEYCLOAK_CONTEXT:-}" ]; then
+  keycloak_kubectl_args=(--context "$KEYCLOAK_CONTEXT")
+fi
+kc() { kubectl "${keycloak_kubectl_args[@]}" "$@"; }
 # Apply from stdin, and remember whether anything changed, so the console
 # restarts only when it has new Secrets to read.
 changed=no
@@ -76,6 +83,12 @@ secret_value() {
     base64 -d 2>/dev/null || true
 }
 
+# Keycloak admin credentials may live on a different cluster from the hub.
+keycloak_secret_value() {
+  kc get secret "$2" -n "$1" -o "go-template={{ with index .data \"$3\" }}{{ . }}{{ end }}" 2>/dev/null |
+    base64 -d 2>/dev/null || true
+}
+
 host=""
 for _ in $(seq 1 60); do
   host="$(k get route "$name" -n "$namespace" -o jsonpath='{.status.ingress[0].host}' 2>/dev/null || true)"
@@ -84,15 +97,15 @@ for _ in $(seq 1 60); do
 done
 [ -n "$host" ] || die "route $namespace/$name not found: has Argo CD synced Application console?"
 
-keycloak_host="$(k get route keycloak -n "$keycloak_namespace" -o jsonpath='{.status.ingress[0].host}')"
+keycloak_host="$(kc get route keycloak -n "$keycloak_namespace" -o jsonpath='{.status.ingress[0].host}')"
 [ -n "$keycloak_host" ] || die "route $keycloak_namespace/keycloak has no host"
 
 # Keycloak: a backend user that may manage organizations in one realm (the
 # backend calls only the organizations and their members), not the master
 # realm's admin.
-admin_user="$(secret_value "$keycloak_namespace" keycloak-secrets KC_BOOTSTRAP_ADMIN_USERNAME)"
+admin_user="$(keycloak_secret_value "$keycloak_namespace" keycloak-secrets KC_BOOTSTRAP_ADMIN_USERNAME)"
 [ -n "$admin_user" ] || die "secret $keycloak_namespace/keycloak-secrets has no KC_BOOTSTRAP_ADMIN_USERNAME"
-token="$(secret_value "$keycloak_namespace" keycloak-secrets KC_BOOTSTRAP_ADMIN_PASSWORD |
+token="$(keycloak_secret_value "$keycloak_namespace" keycloak-secrets KC_BOOTSTRAP_ADMIN_PASSWORD |
   curl -fsS -d grant_type=password -d client_id=admin-cli --data-urlencode "username=$admin_user" \
     --data-urlencode password@- "https://$keycloak_host/realms/master/protocol/openid-connect/token" |
   jq -r .access_token)" || true

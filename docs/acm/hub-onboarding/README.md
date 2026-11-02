@@ -101,11 +101,13 @@ A dedicated hub runs ACM, cert-manager and grid-enrollment, and no Grid or RHOAI
 BOOTSTRAP_PROFILE=dedicated-hub ./bootstrap.sh
 ```
 
-Its root ApplicationSet, [bootstrap/dedicated-hub/applicationset.yaml](../../../bootstrap/dedicated-hub/applicationset.yaml), syncs acm, acm-models, ai-grid-policies, ai-grid-spokes, argo-registration, cert-manager, gitops-config, grid-bootstrap, maas-home, rhoai and rhoai-prerequisites. ACM gets [core](../../../apps/acm/manifests/core) only, since observability needs object storage and Submariner needs a site. The default ApplicationSet skips [apps/cert-manager](../../../apps/cert-manager), because on a combined hub the RHOAI app installs cert-manager.
+Its root ApplicationSet, [bootstrap/dedicated-hub/applicationset.yaml](../../../bootstrap/dedicated-hub/applicationset.yaml), syncs acm, acm-models, ai-grid-policies, ai-grid-spokes, argo-registration, cert-manager, console, gitops-config, grid-bootstrap, maas-home, rhoai and rhoai-prerequisites. ACM gets [core](../../../apps/acm/manifests/core) only, since observability needs object storage and Submariner needs a site. The default ApplicationSet skips [apps/cert-manager](../../../apps/cert-manager), because on a combined hub the RHOAI app installs cert-manager.
 
 [apps/argo-registration](../../../apps/argo-registration) registers every cluster in global with Argo CD, which on a combined hub acm-models does, so the default ApplicationSet skips it. The rhoai app installs RHOAI, and a provider gateway where apps/rhoai/provider-gateway-<cluster>.yaml exists, on each AI Grid site, as [apps/ai-grid-spokes](../../../apps/ai-grid-spokes) selects them by label and role.
 
-acm-models brings only the sample model and its MaaS objects, to AI Grid sites by role. Its GitOpsCluster would duplicate argo-registration, and the console catalog belongs to a combined hub.
+The provider console runs on the hub as a management service. Its Keycloak can run on the MaaS-home spoke; use `HUB_CONTEXT` and `KEYCLOAK_CONTEXT` with [the console credential script](../../../apps/console/README.md).
+
+acm-models delivers the sample model, its MaaS objects and the console catalog to AI Grid sites by role. Its GitOpsCluster remains excluded because it would duplicate argo-registration. Console monitoring settings are unchanged by this profile.
 
 MaaS keeps its shared state on a site, not the hub: label one cluster ai-grid/maas-home=true, and [apps/maas-home](../../../apps/maas-home) installs the maas-db primary, Keycloak and Limitador's Redis there. The default ApplicationSet skips maas-home, because a combined hub runs them itself.
 
@@ -113,7 +115,7 @@ The profile sets two grid-bootstrap values for a new grid on its own hub: extern
 
 rhoai-prerequisites delivers the quay.io/rhoai mirror and pull Secret to every cluster in global, the hub included. The grid-enrollment image needs them, so set RHOAI_QUAY_PULL_SECRET before bootstrap.sh, as for any hub. Without it, grid-bootstrap's CA Job stays in ImagePullBackOff. Applying the mirror reboots each node once, so a single-node hub drops out for a few minutes. To avoid the mirror, pin the grid-enrollment image to the public ODH build in the grid-bootstrap values.
 
-Verify: the eleven Applications Synced and Healthy, the MultiClusterHub Running, and local-cluster joined and available. Do not label local-cluster with ai-grid/enabled; that label alone would make the hub a site.
+Verify: the twelve Applications Synced and Healthy, the MultiClusterHub Running, and local-cluster joined and available. Do not label local-cluster with ai-grid/enabled; that label alone would make the hub a site.
 
 ## Grid ID
 
