@@ -48,7 +48,9 @@ as an override when present.
 - Capacity for the sample models: three replicas of 1 CPU and 10Gi memory. A
   GPU model needs GPU nodes and the NVIDIA operator, which this repository does
   not install.
-- No registry setup. Policies deliver the pull Secrets and the image mirror.
+- Registry prerequisites: conventional clusters receive mirrors through policy;
+  ROSA HCP needs the supported service-managed mirror path below. Policies
+  deliver credentials, including HCP worker credentials.
 
 Still per site, on the hub:
 
@@ -66,6 +68,49 @@ Still per site, on the hub:
   a kubeconfig context or infrastructure hostname as the ACM cluster name.
 - Enough capacity on the target cluster for the applications that the
   ApplicationSets deploy there.
+
+## ROSA HCP preflight
+
+Before importing an HCP spoke:
+
+1. Confirm its role and that it is a fresh cluster, with no retained klusterlet
+   registration or GridNetwork from an older hub. Inspect before reusing a
+   cluster; do not delete old identity or workloads automatically.
+2. Verify administrator access in both contexts, healthy workers, a default
+   StorageClass, sufficient CPU/memory (and GPUs/operator for GPU models), a
+   reachable default router and the network paths required by enrollment and
+   peer gateways. Review provider NetworkPolicy source ranges for a new VPC.
+3. Confirm the hub already has registry credentials for `quay.io/rhoai` and
+   `registry.stage.redhat.io`. A catalog Git token is a separate hub-console
+   prerequisite: use a protected local file via `AI_GRID_GIT_TOKEN_FILE` with
+   Contents read/write access only to the chosen catalog repository. Existing
+   valid console credentials are reused when adding a spoke.
+4. Run `rosa list image-mirrors --cluster "$ROSA_CLUSTER"`. Create or edit the
+   four mappings through ROSA, checking existing records first:
+   `registry.redhat.io/rhoai` to `quay.io/rhoai`, and each of
+   `registry.redhat.io/rhaii`, `registry.redhat.io/rhaii-early-access`,
+   `registry.redhat.io/rhaii-fast` to the same path on `registry.stage.redhat.io`.
+   For a missing mapping, use
+   `rosa create image-mirror --cluster "$ROSA_CLUSTER" --source <source> --mirrors <target>`.
+   Verify the mappings in the guest's service-managed IDMS. Do not create
+   `quay-registry` on HCP or disable the managed admission policy.
+5. Verify every worker is eligible for the managed global-pull-secret syncer,
+   and that the syncer is healthy. The prerequisite policy uses
+   `kube-system/additional-pull-secret`; changing only the guest global
+   pull-secret does not establish worker registry access.
+6. On managed OpenShift, check the required protected namespace creation with
+   the cluster administrator. If ACM cannot create `redhat-ai-grid` or
+   `redhat-ods-operator`, arrange their creation through the approved admin
+   onboarding path before activating the site.
+7. Publish/sync the topology-aware prerequisite policies before import. The
+   remote Redis Placement must exclude inference-only and unlabelled sites.
+
+Import without Grid labels first. Wait for Joined/Available, add-on and Argo
+registration, compliant prerequisite policies, and actual worker credential
+delivery. Only then set `ai-grid/enabled=true` and `ai-grid/role=inference` for
+an inference-only spoke. Do not set `ai-grid/maas-home=true` on that site; the
+existing MaaS home keeps its state services. Check fresh operator bundle pulls
+and CSV installation; do not let terminal OLM failures masquerade as progress.
 
 ## Import a cluster
 

@@ -29,12 +29,6 @@ spec:
                 apiVersion: v1
                 kind: Namespace
                 metadata:
-                  name: redhat-ods-operator
-            - complianceType: musthave
-              objectDefinition:
-                apiVersion: v1
-                kind: Namespace
-                metadata:
                   name: ai-grid-internal-models
                   annotations:
                     argocd.argoproj.io/sync-wave: "0"
@@ -203,32 +197,47 @@ spec:
         spec:
           remediationAction: enforce
           severity: low
-          pruneObjectBehavior: DeleteAll
-          object-templates:
+          # Preserve mirrors owned by the service or an administrator.
+          pruneObjectBehavior: None
+          object-templates-raw: |
+            {{- $infra := lookup "config.openshift.io/v1" "Infrastructure" "" "cluster" -}}
+            {{- $hcp := eq $infra.status.controlPlaneTopology "External" -}}
+            # HCP: unnamed templates are evaluated in inform mode by ACM.
+            # Require the mappings without writing a service-managed resource.
             - complianceType: musthave
               objectDefinition:
                 apiVersion: config.openshift.io/v1
                 kind: ImageDigestMirrorSet
+                {{ if not $hcp }}
                 metadata:
                   name: quay-registry
+                {{ end }}
                 spec:
                   imageDigestMirrors:
                     - source: registry.redhat.io/rhoai
                       mirrors:
                         - quay.io/rhoai
+                      {{ if not $hcp }}
                       mirrorSourcePolicy: NeverContactSource
+                      {{ end }}
                     - source: registry.redhat.io/rhaii
                       mirrors:
                         - registry.stage.redhat.io/rhaii
+                      {{ if not $hcp }}
                       mirrorSourcePolicy: NeverContactSource
+                      {{ end }}
                     - source: registry.redhat.io/rhaii-early-access
                       mirrors:
                         - registry.stage.redhat.io/rhaii-early-access
+                      {{ if not $hcp }}
                       mirrorSourcePolicy: NeverContactSource
+                      {{ end }}
                     - source: registry.redhat.io/rhaii-fast
                       mirrors:
                         - registry.stage.redhat.io/rhaii-fast
+                      {{ if not $hcp }}
                       mirrorSourcePolicy: NeverContactSource
+                      {{ end }}
     - objectDefinition:
         apiVersion: policy.open-cluster-management.io/v1
         kind: ConfigurationPolicy

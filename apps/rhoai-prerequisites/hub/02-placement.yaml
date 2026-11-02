@@ -27,8 +27,44 @@ spec:
               operator: NotIn
               values:
                 - local-cluster
+            # Only enabled MaaS sites use a remote Limitador. Inference-only
+            # and unlabelled clusters do not install that component.
+            - key: ai-grid/enabled
+              operator: In
+              values:
+                - "true"
+            - key: ai-grid/role
+              operator: In
+              values:
+                - ingress
+                - combined
             # The MaaS home runs Redis itself (apps/maas-home).
             - key: ai-grid/maas-home
               operator: NotIn
               values:
                 - "true"
+---
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: rhoai-prerequisites-sites
+  namespace: rhoai-prerequisites
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  clusterSets:
+    - global
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchExpressions:
+            - key: ai-grid/enabled
+              operator: In
+              values:
+                - "true"
+            - key: ai-grid/role
+              operator: In
+              values:
+                - ingress
+                - inference
+                - combined
