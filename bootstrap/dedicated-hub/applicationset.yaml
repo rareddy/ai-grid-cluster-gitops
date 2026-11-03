@@ -25,6 +25,7 @@ spec:
           - path: apps/gitops-config/application.yaml
           - path: apps/grid-bootstrap/application.yaml
           - path: apps/maas-home/application.yaml
+          - path: apps/odf/application.yaml
           - path: apps/argo-registration/application.yaml
           - path: apps/rhoai/application.yaml
           - path: apps/rhoai-prerequisites/application.yaml
