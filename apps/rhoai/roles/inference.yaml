@@ -10,6 +10,7 @@ components:
         managementState: Removed
   dashboard:
     dsc:
-      managementState: Removed
+      standard:
+        managementState: Removed
 praxis-gateway:
   enabled: false

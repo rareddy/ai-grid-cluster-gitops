@@ -60,10 +60,8 @@ services:
 components:
   dashboard:
     dsc:
-      managementState: Managed
-      # TODO: Enable consumer portal once this is in: https://github.com/opendatahub-io/odh-gitops/pull/203
-      # maasConsumerPortal:
-      #  managementState: Managed
+      standard:
+        managementState: Managed
   kserve:
     gateway:
       annotations:
