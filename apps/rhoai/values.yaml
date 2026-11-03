@@ -132,6 +132,7 @@ components:
                         operator: In
                         values:
                           - openshift-ingress
+                          - redhat-ods-applications
                           # MaaS models in a Grid are represented by ExternalModel resources pointing to the Grid GW.
                           - models-as-a-service
                           - redhat-ai-gateway-infra
@@ -156,6 +157,7 @@ components:
                         operator: In
                         values:
                           - openshift-ingress
+                          - redhat-ods-applications
                           # MaaS models in a Grid are represented by ExternalModel resources pointing to the Grid GW.
                           - models-as-a-service
                           - redhat-ai-gateway-infra

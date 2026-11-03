@@ -1,0 +1,779 @@
+# End-user portal on the existing MaaS gateway; dashboard OAuth is unchanged.
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: maas-home-portal
+  namespace: maas-home
+  annotations:
+    argocd.argoproj.io/sync-wave: '2'
+spec:
+  clusterSets:
+  - global
+  numberOfClusters: 1
+  predicates:
+  - requiredClusterSelector:
+      labelSelector:
+        matchLabels:
+          ai-grid/maas-home: 'true'
+          ai-grid/enabled: 'true'
+        matchExpressions:
+        - key: ai-grid/role
+          operator: In
+          values:
+          - ingress
+          - combined
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: maas-home-portal-entrypoint
+  namespace: maas-home
+  annotations:
+    argocd.argoproj.io/sync-wave: '3'
+spec:
+  remediationAction: enforce
+  disabled: false
+  policy-templates:
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: maas-home-portal-entrypoint
+      spec:
+        remediationAction: enforce
+        severity: high
+        pruneObjectBehavior: None
+        object-templates-raw: |
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: route.openshift.io/v1
+              kind: Route
+              metadata:
+                name: maas-portal
+                namespace: openshift-ingress
+                labels:
+                  app.kubernetes.io/part-of: maas-consumer-gateway
+              spec:
+                to:
+                  kind: Service
+                  name: maas-default-gateway-maas-gateway-class
+                port:
+                  targetPort: https
+                tls:
+                  termination: reencrypt
+                  insecureEdgeTerminationPolicy: Redirect
+                  destinationCACertificate: {{ fromConfigMap "openshift-ingress" "openshift-service-ca.crt" "service-ca.crt" | toRawJson }}
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: generators.external-secrets.io/v1alpha1
+              kind: Password
+              metadata:
+                name: maas-consumer-cookie
+                namespace: redhat-ods-applications
+                labels:
+                  app.kubernetes.io/part-of: maas-consumer-gateway
+              spec:
+                length: 32
+                digits: 8
+                symbols: 0
+                noUpper: false
+                allowRepeat: true
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: external-secrets.io/v1
+              kind: ExternalSecret
+              metadata:
+                name: maas-consumer-cookie
+                namespace: redhat-ods-applications
+                labels:
+                  app.kubernetes.io/part-of: maas-consumer-gateway
+              spec:
+                refreshPolicy: CreatedOnce
+                refreshInterval: 0s
+                target:
+                  name: maas-consumer-cookie
+                  creationPolicy: Owner
+                  deletionPolicy: Retain
+                  template:
+                    type: Opaque
+                dataFrom:
+                - sourceRef:
+                    generatorRef:
+                      apiVersion: generators.external-secrets.io/v1alpha1
+                      kind: Password
+                      name: maas-consumer-cookie
+                  rewrite:
+                  - regexp:
+                      source: ^password$
+                      target: OAUTH2_PROXY_COOKIE_SECRET
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                name: maas-consumer-client
+                namespace: redhat-ods-applications
+                labels:
+                  app.kubernetes.io/part-of: maas-consumer-gateway
+              type: Opaque
+              data:
+                OAUTH2_PROXY_CLIENT_ID: {{ fromSecret "maas-db" "keycloak-secrets" "KEYCLOAK_CLIENT_ID" | toRawJson }}
+                OAUTH2_PROXY_CLIENT_SECRET: {{ fromSecret "maas-db" "keycloak-secrets" "KEYCLOAK_CLIENT_SECRET" | toRawJson }}
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: maas-home-portal-oidc
+  namespace: maas-home
+  annotations:
+    argocd.argoproj.io/sync-wave: '3'
+spec:
+  remediationAction: enforce
+  disabled: false
+  policy-templates:
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: maas-home-portal-oidc
+      spec:
+        remediationAction: enforce
+        severity: high
+        pruneObjectBehavior: None
+        object-templates-raw: |
+          {{- $route := lookup "route.openshift.io/v1" "Route" "openshift-ingress" "maas-portal" -}}
+          {{- $host := (index $route.status.ingress 0).host -}}
+          {{- $tenant := lookup "maas.opendatahub.io/v1alpha1" "AITenant" "ai-tenants" "models-as-a-service" -}}
+          {{- $issuer := $tenant.spec.oidc.issuerUrl -}}
+          {{- $client := $tenant.spec.oidc.clientId -}}
+          {{- $proxy := lookup "apps/v1" "Deployment" "openshift-ingress" "kube-auth-proxy" -}}
+          {{- $image := (index $proxy.spec.template.spec.containers 0).image -}}
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: v1
+              kind: ServiceAccount
+              metadata:
+                name: maas-consumer-auth-proxy
+                namespace: redhat-ods-applications
+                labels:
+                  app.kubernetes.io/part-of: maas-consumer-gateway
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: maas-consumer-auth-proxy
+                namespace: redhat-ods-applications
+                labels:
+                  app: maas-consumer-auth-proxy
+                  app.kubernetes.io/part-of: maas-consumer-gateway
+              spec:
+                replicas: 1
+                selector:
+                  matchLabels:
+                    app: maas-consumer-auth-proxy
+                template:
+                  metadata:
+                    labels:
+                      app: maas-consumer-auth-proxy
+                  spec:
+                    serviceAccountName: maas-consumer-auth-proxy
+                    containers:
+                    - name: oauth-proxy
+                      image: {{ $image }}
+                      imagePullPolicy: IfNotPresent
+                      args:
+                      - --http-address=0.0.0.0:4180
+                      - --metrics-address=0.0.0.0:9000
+                      - --reverse-proxy=true
+                      - --email-domain=*
+                      - --upstream=static://200
+                      - --skip-provider-button
+                      - --pass-access-token=true
+                      - --set-xauthrequest=true
+                      - --provider=oidc
+                      - --oidc-issuer-url={{ $issuer }}
+                      - --scope=openid email profile
+                      - --oidc-email-claim=email
+                      - --oidc-groups-claim=groups
+                      - --use-system-trust-store=true
+                      - --ssl-insecure-skip-verify=false
+                      - --redirect-url=https://{{ $host }}/oauth2/callback
+                      - --cookie-domain={{ $host }}
+                      - --cookie-name=_maas_consumer_proxy
+                      - --cookie-expire=24h0m0s
+                      - --cookie-refresh=4m0s
+                      - --cookie-secure=true
+                      - --cookie-httponly=true
+                      - --cookie-samesite=lax
+                      - --enable-k8s-token-validation=false
+                      env:
+                      - name: OAUTH2_PROXY_CLIENT_ID
+                        valueFrom:
+                          secretKeyRef:
+                            name: maas-consumer-client
+                            key: OAUTH2_PROXY_CLIENT_ID
+                      - name: OAUTH2_PROXY_CLIENT_SECRET
+                        valueFrom:
+                          secretKeyRef:
+                            name: maas-consumer-client
+                            key: OAUTH2_PROXY_CLIENT_SECRET
+                      - name: OAUTH2_PROXY_COOKIE_SECRET
+                        valueFrom:
+                          secretKeyRef:
+                            name: maas-consumer-cookie
+                            key: OAUTH2_PROXY_COOKIE_SECRET
+                      ports:
+                      - name: http
+                        containerPort: 4180
+                      - name: metrics
+                        containerPort: 9000
+                      readinessProbe:
+                        httpGet:
+                          path: /ping
+                          port: http
+                      livenessProbe:
+                        httpGet:
+                          path: /ping
+                          port: http
+                      resources:
+                        requests:
+                          cpu: 100m
+                          memory: 128Mi
+                        limits:
+                          memory: 128Mi
+                      securityContext:
+                        allowPrivilegeEscalation: false
+                        readOnlyRootFilesystem: true
+                        capabilities:
+                          drop:
+                          - ALL
+                      volumeMounts:
+                      - name: tmp
+                        mountPath: /tmp
+                    volumes:
+                    - name: tmp
+                      emptyDir:
+                        medium: Memory
+                        sizeLimit: 10Mi
+                    automountServiceAccountToken: false
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: maas-consumer-auth-proxy
+                namespace: redhat-ods-applications
+                labels:
+                  app: maas-consumer-auth-proxy
+                  app.kubernetes.io/part-of: maas-consumer-gateway
+              spec:
+                selector:
+                  app: maas-consumer-auth-proxy
+                ports:
+                - name: http
+                  port: 4180
+                  targetPort: 4180
+                - name: metrics
+                  port: 9000
+                  targetPort: 9000
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: HTTPRoute
+              metadata:
+                name: maas-consumer-ui
+                namespace: redhat-ods-applications
+                labels:
+                  app.kubernetes.io/part-of: maas-consumer-gateway
+              spec:
+                hostnames:
+                - {{ $host }}
+                parentRefs:
+                - name: maas-default-gateway
+                  namespace: openshift-ingress
+                  sectionName: https
+                rules:
+                - matches:
+                  - path:
+                      type: Exact
+                      value: /maas-portal
+                  filters:
+                  - type: RequestRedirect
+                    requestRedirect:
+                      path:
+                        type: ReplaceFullPath
+                        replaceFullPath: /maas-portal/
+                      statusCode: 302
+                - matches:
+                  - path:
+                      type: PathPrefix
+                      value: /maas-portal
+                  filters:
+                  - type: URLRewrite
+                    urlRewrite:
+                      path:
+                        type: ReplacePrefixMatch
+                        replacePrefixMatch: /
+                  - type: RequestHeaderModifier
+                    requestHeaderModifier:
+                      remove:
+                      - x-auth-request-preferred-username
+                      - x-auth-request-groups
+                      - x-auth-request-access-token
+                      - x-forwarded-email
+                      - x-forwarded-groups
+                      - x-forwarded-preferred-username
+                      - x-maas-username
+                      - x-maas-group
+                      - x-maas-orgid
+                      - x-maas-roles
+                      - x-maas-keyname
+                      - x-maas-subscription-rate-limit-id
+                      - x-maas-identity
+                      - x-maas-organization-id
+                      - x-maas-cost-center
+                      - x-maas-admin-scope
+                  - type: ResponseHeaderModifier
+                    responseHeaderModifier:
+                      set:
+                      - name: Cache-Control
+                        value: no-store
+                  backendRefs:
+                  - name: maas-portal
+                    port: 8443
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: HTTPRoute
+              metadata:
+                name: maas-consumer-oauth2
+                namespace: redhat-ods-applications
+                labels:
+                  app.kubernetes.io/part-of: maas-consumer-gateway
+              spec:
+                hostnames:
+                - {{ $host }}
+                parentRefs:
+                - name: maas-default-gateway
+                  namespace: openshift-ingress
+                  sectionName: https
+                rules:
+                - matches:
+                  - path:
+                      type: PathPrefix
+                      value: /oauth2
+                  backendRefs:
+                  - name: maas-consumer-auth-proxy
+                    port: 4180
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: kuadrant.io/v1
+              kind: AuthPolicy
+              metadata:
+                name: maas-consumer-ui-oidc
+                namespace: redhat-ods-applications
+                annotations:
+                  auth-proxy-service-url: http://maas-consumer-auth-proxy.redhat-ods-applications.svc.cluster.local:4180/oauth2/auth
+                labels:
+                  app.kubernetes.io/part-of: maas-consumer-gateway
+              spec:
+                targetRef:
+                  group: gateway.networking.k8s.io
+                  kind: HTTPRoute
+                  name: maas-consumer-ui
+                rules:
+                  authentication:
+                    direct-jwt:
+                      priority: 0
+                      jwt:
+                        issuerUrl: {{ $issuer }}
+                        ttl: 300
+                      credentials:
+                        authorizationHeader:
+                          prefix: Bearer
+                    browser:
+                      priority: 1
+                      when:
+                      - predicate: '!has(request.headers.authorization)'
+                      anonymous: {}
+                  authorization:
+                    session-and-identity:
+                      priority: 0
+                      opa:
+                        allValues: true
+                        rego: |
+                          allow = true
+
+                          login_location := sprintf("/oauth2/start?rd=%s", [urlquery.encode(input.context.request.http.path)])
+
+                          application_cookies := concat("; ", [entry |
+                            raw := split(object.get(input.context.request.http.headers, "cookie", ""), ";")[_]
+                            entry := trim_space(raw)
+                            entry != ""
+                            name := trim_space(split(entry, "=")[0])
+                            not startswith(name, "_maas_consumer_proxy")
+                          ])
+
+                          organization = result {
+                            orgs := object.get(organization_claims, "https://redhat.com/maas/orgs", [])
+                            count(orgs) == 1
+                            org := orgs[0]
+                            org_id := object.get(org, "organization_id", object.get(org, "tenant_id", ""))
+                            is_string(org_id)
+                            org_id != ""
+                            roles := object.get(org, "roles", [])
+                            is_array(roles)
+                            result := {
+                              "org_id": org_id,
+                              "roles_header": json.marshal(roles)
+                            }
+                          } else = {"org_id": "", "roles_header": "[]"}
+
+                          organization_claims = claims {
+                            not input.auth.identity.anonymous
+                            claims := input.auth.identity
+                          } else = claims {
+                            identity.authenticated
+                            [_, claims, _] := io.jwt.decode(identity.access_token)
+                          } else = {}
+
+                          identity = result {
+                            not input.auth.identity.anonymous
+                            claims := input.auth.identity
+                            usernames := [user |
+                              user := [object.get(claims, "preferred_username", ""), object.get(claims, "sub", "")][_]
+                              user != ""
+                            ]
+                            username := usernames[0]
+                            authorization := input.context.request.http.headers.authorization
+                            groups := {trim_space(group) |
+                              group := object.get(claims, "groups", [])[_]
+                              trim_space(group) != ""
+                              trim_space(group) != "system:authenticated"
+                            }
+                            result := {
+                              "authenticated": true,
+                              "authorization": authorization,
+                              "access_token": trim_prefix(authorization, "Bearer "),
+                              "username": username,
+                              "email": object.get(claims, "email", ""),
+                              "groups_header": json.marshal(array.concat(["system:authenticated"], sort(groups)))
+                            }
+                          } else = result {
+                            input.auth.identity.anonymous
+                            cookie := object.get(input.context.request.http.headers, "cookie", "")
+                            cookie != ""
+                            response := http.send({
+                              "method": "GET",
+                              "url": "http://maas-consumer-auth-proxy.redhat-ods-applications.svc.cluster.local:4180/oauth2/auth",
+                              "headers": {"Cookie": cookie},
+                              "timeout": "2s",
+                              "cache": false,
+                              "enable_redirect": false,
+                              "raise_error": false
+                            })
+                            {200, 202}[response.status_code]
+                            token := object.get(response.headers, "x-auth-request-access-token", [""])[0]
+                            usernames := [user |
+                              user := [object.get(response.headers, "x-auth-request-preferred-username", [""])[0], object.get(response.headers, "x-auth-request-user", [""])[0]][_]
+                              user != ""
+                            ]
+                            username := usernames[0]
+                            token != ""
+                            groups := {trim_space(group) |
+                              group := split(object.get(response.headers, "x-auth-request-groups", [""])[0], ",")[_]
+                              trim_space(group) != ""
+                              trim_space(group) != "system:authenticated"
+                            }
+                            result := {
+                              "authenticated": true,
+                              "authorization": concat("", ["Bearer ", token]),
+                              "access_token": token,
+                              "username": username,
+                              "email": object.get(response.headers, "x-auth-request-email", [""])[0],
+                              "groups_header": json.marshal(array.concat(["system:authenticated"], sort(groups)))
+                            }
+                          } else = {"authenticated": false}
+                    require-auth:
+                      priority: 1
+                      patternMatching:
+                        patterns:
+                        - predicate: auth.authorization['session-and-identity'].identity.authenticated
+                    client-bound:
+                      priority: 1
+                      when:
+                      - predicate: '!has(auth.identity.anonymous)'
+                      patternMatching:
+                        patterns:
+                        - predicate: has(auth.identity.iss) && auth.identity.iss == '{{ $issuer }}'
+                        - predicate: has(auth.identity.azp) && auth.identity.azp == '{{ $client }}'
+                        - predicate: has(auth.identity.aud) && (auth.identity.aud == '{{ $client }}' || '{{ $client }}' in auth.identity.aud)
+                        - predicate: has(auth.identity.token_use) && auth.identity.token_use == 'access'
+                  response:
+                    success:
+                      headers:
+                        authorization:
+                          plain:
+                            expression: auth.authorization['session-and-identity'].identity.authorization
+                        x-maas-username:
+                          plain:
+                            expression: auth.authorization['session-and-identity'].identity.username
+                        x-maas-group:
+                          plain:
+                            expression: auth.authorization['session-and-identity'].identity.groups_header
+                        x-maas-orgid:
+                          plain:
+                            expression: auth.authorization['session-and-identity'].organization.org_id
+                        x-maas-roles:
+                          plain:
+                            expression: auth.authorization['session-and-identity'].organization.roles_header
+                        x-auth-request-user:
+                          plain:
+                            expression: auth.authorization['session-and-identity'].identity.username
+                        x-auth-request-email:
+                          plain:
+                            expression: auth.authorization['session-and-identity'].identity.email
+                        x-forwarded-access-token:
+                          plain:
+                            expression: auth.authorization['session-and-identity'].identity.access_token
+                        cookie:
+                          plain:
+                            expression: auth.authorization['session-and-identity'].application_cookies
+                        x-forwarded-user:
+                          plain:
+                            expression: auth.authorization['session-and-identity'].identity.username
+                    unauthenticated:
+                      code: 401
+                      message:
+                        value: Invalid bearer token
+                    unauthorized:
+                      code: 302
+                      message:
+                        value: Redirecting to login
+                      headers:
+                        Location:
+                          expression: |
+                            has(auth.authorization) && 'session-and-identity' in auth.authorization ? auth.authorization['session-and-identity'].login_location : '/oauth2/start?rd=%2Fmaas-portal%2F'
+                        Cache-Control:
+                          value: no-store
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: kuadrant.io/v1
+              kind: AuthPolicy
+              metadata:
+                name: maas-consumer-oauth2-anonymous
+                namespace: redhat-ods-applications
+                labels:
+                  app.kubernetes.io/part-of: maas-consumer-gateway
+              spec:
+                targetRef:
+                  group: gateway.networking.k8s.io
+                  kind: HTTPRoute
+                  name: maas-consumer-oauth2
+                rules:
+                  authentication:
+                    public-login:
+                      anonymous: {}
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: networking.k8s.io/v1
+              kind: NetworkPolicy
+              metadata:
+                name: maas-consumer-auth-proxy-ingress
+                namespace: redhat-ods-applications
+                labels:
+                  app.kubernetes.io/part-of: maas-consumer-gateway
+              spec:
+                podSelector:
+                  matchLabels:
+                    app: maas-consumer-auth-proxy
+                policyTypes:
+                - Ingress
+                ingress:
+                - from:
+                  - namespaceSelector:
+                      matchLabels:
+                        kubernetes.io/metadata.name: kuadrant-system
+                    podSelector:
+                      matchLabels:
+                        authorino-resource: authorino
+                  - namespaceSelector:
+                      matchLabels:
+                        kubernetes.io/metadata.name: openshift-ingress
+                    podSelector:
+                      matchLabels:
+                        gateway.networking.k8s.io/gateway-name: maas-default-gateway
+                  ports:
+                  - protocol: TCP
+                    port: 4180
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: networking.istio.io/v1alpha3
+              kind: EnvoyFilter
+              metadata:
+                name: maas-consumer-payload-processing-bypass
+                namespace: openshift-ingress
+                labels:
+                  app.kubernetes.io/part-of: maas-consumer-gateway
+              spec:
+                priority: 20
+                workloadSelector:
+                  labels:
+                    gateway.networking.k8s.io/gateway-name: maas-default-gateway
+                configPatches:
+                - applyTo: HTTP_ROUTE
+                  match:
+                    context: GATEWAY
+                    routeConfiguration:
+                      vhost:
+                        route:
+                          name: redhat-ods-applications.maas-consumer-ui.0
+                  patch:
+                    operation: MERGE
+                    value:
+                      typed_per_filter_config:
+                        envoy.filters.http.ext_proc.ipp-pre:
+                          '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                          disabled: true
+                        envoy.filters.http.ext_proc.ipp:
+                          '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                          disabled: true
+                        envoy.filters.http.ext_proc.external-model:
+                          '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                          disabled: true
+                        envoy.filters.http.ext_proc.external-model-pre:
+                          '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                          disabled: true
+                - applyTo: HTTP_ROUTE
+                  match:
+                    context: GATEWAY
+                    routeConfiguration:
+                      vhost:
+                        route:
+                          name: redhat-ods-applications.maas-consumer-ui.1
+                  patch:
+                    operation: MERGE
+                    value:
+                      typed_per_filter_config:
+                        envoy.filters.http.ext_proc.ipp-pre:
+                          '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                          disabled: true
+                        envoy.filters.http.ext_proc.ipp:
+                          '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                          disabled: true
+                        envoy.filters.http.ext_proc.external-model:
+                          '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                          disabled: true
+                        envoy.filters.http.ext_proc.external-model-pre:
+                          '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                          disabled: true
+                - applyTo: HTTP_ROUTE
+                  match:
+                    context: GATEWAY
+                    routeConfiguration:
+                      vhost:
+                        route:
+                          name: redhat-ods-applications.maas-consumer-oauth2.0
+                  patch:
+                    operation: MERGE
+                    value:
+                      typed_per_filter_config:
+                        envoy.filters.http.ext_proc.ipp-pre:
+                          '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                          disabled: true
+                        envoy.filters.http.ext_proc.ipp:
+                          '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                          disabled: true
+                        envoy.filters.http.ext_proc.external-model:
+                          '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                          disabled: true
+                        envoy.filters.http.ext_proc.external-model-pre:
+                          '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                          disabled: true
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: networking.istio.io/v1
+              kind: DestinationRule
+              metadata:
+                name: maas-consumer-portal-backend-tls
+                namespace: openshift-ingress
+                labels:
+                  app.kubernetes.io/part-of: maas-consumer-gateway
+              spec:
+                host: maas-portal.redhat-ods-applications.svc.cluster.local
+                trafficPolicy:
+                  portLevelSettings:
+                  - port:
+                      number: 8443
+                    tls:
+                      mode: SIMPLE
+                      caCertificates: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+                      sni: maas-portal.redhat-ods-applications.svc.cluster.local
+                      subjectAltNames:
+                      - maas-portal.redhat-ods-applications.svc
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: kuadrant.io/v1alpha1
+              kind: TokenRateLimitPolicy
+              metadata:
+                name: maas-consumer-ui-non-inference
+                namespace: redhat-ods-applications
+                labels:
+                  app.kubernetes.io/part-of: maas-consumer-gateway
+              spec:
+                targetRef:
+                  group: gateway.networking.k8s.io
+                  kind: HTTPRoute
+                  name: maas-consumer-ui
+                defaults:
+                  strategy: atomic
+                  limits:
+                    non-inference:
+                      rates:
+                      - limit: 0
+                        window: 1m
+                      when:
+                      - predicate: 'false'
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: kuadrant.io/v1alpha1
+              kind: TokenRateLimitPolicy
+              metadata:
+                name: maas-consumer-oauth2-non-inference
+                namespace: redhat-ods-applications
+                labels:
+                  app.kubernetes.io/part-of: maas-consumer-gateway
+              spec:
+                targetRef:
+                  group: gateway.networking.k8s.io
+                  kind: HTTPRoute
+                  name: maas-consumer-oauth2
+                defaults:
+                  strategy: atomic
+                  limits:
+                    non-inference:
+                      rates:
+                      - limit: 0
+                        window: 1m
+                      when:
+                      - predicate: 'false'
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: maas-home-portal
+  namespace: maas-home
+  annotations:
+    argocd.argoproj.io/sync-wave: '3'
+placementRef:
+  apiGroup: cluster.open-cluster-management.io
+  kind: Placement
+  name: maas-home-portal
+subjects:
+- apiGroup: policy.open-cluster-management.io
+  kind: Policy
+  name: maas-home-portal-entrypoint
+- apiGroup: policy.open-cluster-management.io
+  kind: Policy
+  name: maas-home-portal-oidc
