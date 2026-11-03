@@ -22,7 +22,7 @@ operator:
             value: quay.io/opendatahub/odh-model-controller@sha256:4fefe21382dbe0e0d55f735078b6ef751c06204463b974783f2d14d2636c753a
           # Temporary change to test maas-api loki proxy
           - name: RELATED_IMAGE_ODH_MAAS_API_IMAGE
-            value: quay.io/khowell_dev/maas-api:loki-access-proxy
+            value: quay.io/rareddy/maas-api@sha256:9c61a4b729d4c893c04d00d531de2ab516447de943b5ff7c4986ca41ed7da2fa
 # Workaround for https://redhat.atlassian.net/browse/RHOAIENG-99507:
 # RHACM's multicluster-observability-addon also installs COO with its own
 # OperatorGroup (named after the namespace), which conflicts with the chart's
