@@ -1,4 +1,7 @@
 skipCrdCheck: true
+# Render the chart patch that gives Authorino OpenShift service-CA trust.
+argocd:
+  enabled: true
 profile: maas
 operator:
   type: rhoai
