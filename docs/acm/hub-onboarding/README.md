@@ -107,6 +107,8 @@ Its root ApplicationSet, [bootstrap/dedicated-hub/applicationset.yaml](../../../
 
 The root generates all Applications except ODF directly from Git, so ACM and argo-registration can start on a fresh hub without an existing Argo cluster registration. ODF is generated separately once the local-cluster registration carries the openshiftVersion-major-minor label; its operator channel then matches that version. Until registration and the version label are available, ODF is absent and ACM observability may wait for its object storage. Verify that acm and argo-registration exist immediately, then check registration and the version label if odf does not appear. An ApplicationSet success condition alone does not confirm that the expected Applications were generated.
 
+ODF installs into openshift-storage, which OLM allows only one OperatorGroup. The ODF app creates that group and never prunes it. On a hub that already has one there, for example from an LVMS install, label the local-cluster ManagedCluster ai-grid/odf-operatorgroup=existing so ODF uses it instead.
+
 [apps/argo-registration](../../../apps/argo-registration) registers every cluster in global with Argo CD, which on a combined hub acm-models does, so the default ApplicationSet skips it. The rhoai app installs RHOAI and the role's Grid gateways on each AI Grid site, as [apps/ai-grid-spokes](../../../apps/ai-grid-spokes) selects them by label and role.
 
 acm-models brings the sample model and its MaaS objects, to AI Grid sites by role, and the provider console's catalog: its AppProjects and ApplicationSets, which deliver the models and subscriptions the console commits (see [Provider console](#provider-console)). Its GitOpsCluster would duplicate argo-registration, so it stays out.

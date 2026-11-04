@@ -78,6 +78,7 @@ spec:
   # here.
   # Limitador runs on the sites, so limitador-redis leaves out its storage config.
   # ODF's operator channel follows the hub's OpenShift minor version.
+  # A hub labelled ai-grid/odf-operatorgroup=existing keeps its own OperatorGroup.
   templatePatch: |
     {{- $spec := .spec }}
     {{- if eq .metadata.name "grid-bootstrap" }}
@@ -86,7 +87,11 @@ spec:
     {{- end }}{{ end }}
     {{- end }}
     {{- if eq .metadata.name "odf" }}
-    {{- $_ := set $spec.source.helm "parameters" (list (dict "name" "openshift.version" "value" (index .metadata.labels "openshiftVersion-major-minor"))) }}
+    {{- $params := list (dict "name" "openshift.version" "value" (index .metadata.labels "openshiftVersion-major-minor")) }}
+    {{- if eq (index .metadata.labels "ai-grid/odf-operatorgroup") "existing" }}
+    {{- $params = append $params (dict "name" "operatorGroup.create" "value" "false") }}
+    {{- end }}
+    {{- $_ := set $spec.source.helm "parameters" $params }}
     {{- end }}
     {{- if eq .metadata.name "acm-models" }}
     {{- $_ := set $spec.source "directory" (dict "include" "{facebook-opt-125m-03-applicationset.yaml,maas-03-applicationset.yaml,catalog-03-appprojects.yaml,catalog-04-applicationsets.yaml}") }}

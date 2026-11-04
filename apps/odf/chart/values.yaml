@@ -4,3 +4,8 @@
 # combined-hub bootstrap, which has no cluster labels to draw from.
 openshift:
   version: "4.22"
+
+# OLM fails every CSV in a namespace with two OperatorGroups. Set false when
+# openshift-storage already has one, for example from an LVMS install.
+operatorGroup:
+  create: true
