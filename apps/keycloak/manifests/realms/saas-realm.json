@@ -83,6 +83,35 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "keycloak-redirect-uris",
+      "name": "MaaS redirect URI reconciler",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${KEYCLOAK_REDIRECT_URIS_CLIENT_SECRET}",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "redirectUris": [],
+      "defaultClientScopes": [
+        "basic"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-keycloak-redirect-uris",
+      "enabled": true,
+      "serviceAccountClientId": "keycloak-redirect-uris",
+      "clientRoles": {
+        "realm-management": [
+          "view-clients",
+          "manage-clients"
+        ]
+      }
     }
   ],
   "identityProviders": [

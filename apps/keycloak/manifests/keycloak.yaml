@@ -36,6 +36,7 @@ spec:
                   line=${line//\$\{KEYCLOAK_PUBLIC_URL\}/$KEYCLOAK_PUBLIC_URL}
                   line=${line//\$\{KEYCLOAK_REDIRECT_URI\}/$KEYCLOAK_REDIRECT_URI}
                   line=${line//\$\{KEYCLOAK_CLIENT_SECRET\}/$KEYCLOAK_CLIENT_SECRET}
+                  line=${line//\$\{KEYCLOAK_REDIRECT_URIS_CLIENT_SECRET\}/$KEYCLOAK_REDIRECT_URIS_CLIENT_SECRET}
                   line=${line//\$\{GRID_TENANT_1_BROKER_CLIENT_SECRET\}/$GRID_TENANT_1_BROKER_CLIENT_SECRET}
                   line=${line//\$\{GRID_TENANT_2_BROKER_CLIENT_SECRET\}/$GRID_TENANT_2_BROKER_CLIENT_SECRET}
                   line=${line//\$\{GRID_TENANT_1_TEST_USER_PASSWORD\}/$GRID_TENANT_1_TEST_USER_PASSWORD}
@@ -52,6 +53,8 @@ spec:
           envFrom:
             - secretRef:
                 name: keycloak-secrets
+            - secretRef:
+                name: keycloak-redirect-uris-secret
             - configMapRef:
                 name: keycloak-public-url
           env:

@@ -122,9 +122,9 @@ spec:
                   /opt/keycloak/bin/kcadm.sh config credentials \
                     --config "$kcadm_config" \
                     --server http://keycloak.maas-db.svc.cluster.local:8080 \
-                    --realm master \
-                    --user "$KC_BOOTSTRAP_ADMIN_USERNAME" \
-                    --password "$KC_BOOTSTRAP_ADMIN_PASSWORD" >/dev/null
+                    --realm saas \
+                    --client keycloak-redirect-uris \
+                    --secret "$KEYCLOAK_REDIRECT_URIS_CLIENT_SECRET" >/dev/null
 
                   client_uuid="$(/opt/keycloak/bin/kcadm.sh get clients \
                     --config "$kcadm_config" \
@@ -143,6 +143,8 @@ spec:
               envFrom:
                 - secretRef:
                     name: keycloak-secrets
+                - secretRef:
+                    name: keycloak-redirect-uris-secret
               resources:
                 requests:
                   cpu: 10m

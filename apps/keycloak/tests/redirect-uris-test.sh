@@ -11,12 +11,16 @@ kubectl kustomize "$HERE/.." > "$TMP_DIR/rendered.yaml"
 
 python3 - "$TMP_DIR/rendered.yaml" "$TMP_DIR" <<'PY'
 import sys
+import json
 import yaml
 
 documents = list(yaml.safe_load_all(open(sys.argv[1])))
 cron_job = next(document for document in documents
                 if document and document.get("kind") == "CronJob"
                 and document["metadata"]["name"] == "keycloak-redirect-uris")
+keycloak_deployment = next(document for document in documents
+                           if document and document.get("kind") == "Deployment"
+                           and document["metadata"]["name"] == "keycloak")
 assert cron_job["spec"]["schedule"] == "*/5 * * * *"
 assert cron_job["spec"]["concurrencyPolicy"] == "Forbid"
 pod_spec = cron_job["spec"]["jobTemplate"]["spec"]["template"]["spec"]
@@ -26,6 +30,24 @@ init_container = pod_spec["initContainers"][0]
 update_container = pod_spec["containers"][0]
 init_script = init_container["command"][2]
 update_script = update_container["command"][2]
+update_secret_names = {
+    secret["secretRef"]["name"]
+    for secret in update_container.get("envFrom", [])
+    if "secretRef" in secret
+}
+assert "keycloak-redirect-uris-secret" in update_secret_names
+keycloak_pod_spec = keycloak_deployment["spec"]["template"]["spec"]
+keycloak_init_container = keycloak_pod_spec["initContainers"][0]
+keycloak_init_secret_names = {
+    secret["secretRef"]["name"]
+    for secret in keycloak_init_container.get("envFrom", [])
+    if "secretRef" in secret
+}
+assert "keycloak-redirect-uris-secret" in keycloak_init_secret_names
+realm_volume = next(volume for volume in keycloak_pod_spec["volumes"]
+                    if volume["name"] == "realm-import-source")
+assert realm_volume["configMap"]["name"] != "keycloak-realm-import"
+assert realm_volume["configMap"]["name"].startswith("keycloak-realm-import-")
 assert "ai-grid/enabled=true,ai-grid/role in (ingress,combined)" in init_script
 assert "consoleurl.cluster.open-cluster-management.io" in init_script
 assert "https://maas.apps.%s/oauth2/callback" in init_script
@@ -37,7 +59,38 @@ assert "--realm master" in update_script
 assert "--realm saas" not in update_script
 assert update_script.count("--target-realm saas") == 2
 assert '--config "$kcadm_config"' in update_script
+assert '--realm saas' in update_script
+assert '--client keycloak-redirect-uris' in update_script
+assert '--secret "$KEYCLOAK_REDIRECT_URIS_CLIENT_SECRET"' in update_script
+assert "KC_BOOTSTRAP_ADMIN_USERNAME" not in update_script
+assert "KC_BOOTSTRAP_ADMIN_PASSWORD" not in update_script
 assert "redirectUris=" in update_script
+
+secret = next(document for document in documents
+              if document and document.get("kind") == "ExternalSecret"
+              and document["metadata"]["name"] == "keycloak-redirect-uris-secret")
+generators = {
+    source["sourceRef"]["generatorRef"]["name"]
+    for source in secret["spec"]["dataFrom"]
+}
+assert "keycloak-redirect-uris-client-secret" in generators
+assert any(
+    rewrite["regexp"]["target"] == "KEYCLOAK_REDIRECT_URIS_CLIENT_SECRET"
+    for source in secret["spec"]["dataFrom"]
+    for rewrite in source["rewrite"]
+)
+assert secret["spec"]["target"]["name"] == "keycloak-redirect-uris-secret"
+
+realm_config_map = next(document for document in documents
+                        if document and document.get("kind") == "ConfigMap"
+                        and document["metadata"]["name"].startswith("keycloak-realm-import"))
+realm = json.loads(realm_config_map["data"]["saas-realm.json"])
+admin_client = next(client for client in realm["clients"]
+                    if client["clientId"] == "keycloak-redirect-uris")
+assert admin_client["serviceAccountsEnabled"] is True
+service_account = next(user for user in realm["users"]
+                       if user["serviceAccountClientId"] == "keycloak-redirect-uris")
+assert service_account["clientRoles"]["realm-management"] == ["view-clients", "manage-clients"]
 with open(f"{sys.argv[2]}/init.sh", "w") as stream:
     stream.write(init_script)
 with open(f"{sys.argv[2]}/update.sh", "w") as stream:

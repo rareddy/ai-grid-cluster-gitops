@@ -89,6 +89,11 @@ combined role removes its callback on the next run. A Keycloak restart imports
 the realm from Git and resets the client to the smoke-test redirect; the next
 CronJob run restores the cluster callbacks.
 
+The updater authenticates with the realm-scoped `keycloak-redirect-uris`
+service account, whose generated client secret is stored in the dedicated
+`keycloak-redirect-uris-secret` Secret. It has only the `saas` realm's client
+view and manage permissions.
+
 ## Stable Signing Keys
 
 Each realm uses a dedicated cert-manager-managed RSA signing key. cert-manager
