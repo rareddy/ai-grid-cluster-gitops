@@ -78,7 +78,7 @@ spec:
             - -c
           args:
             - |
-              /opt/keycloak/bin/kc.sh import --dir /opt/keycloak/data/import --override true
+              /opt/keycloak/bin/kc.sh import --dir /opt/keycloak/data/import --override false
               exec /opt/keycloak/bin/kc.sh start
           ports:
             - name: http
