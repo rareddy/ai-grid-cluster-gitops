@@ -3,4 +3,5 @@ kind: Kustomization
 resources:
   - core
   - observability
+  - search
   - submariner

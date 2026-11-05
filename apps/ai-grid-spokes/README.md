@@ -95,7 +95,8 @@ sites with role ingress or combined.
 `rhoai-prerequisites` (with the model namespace and its NetworkPolicies, the
 image mirror and the pull secret, and its `rhoai-limitador-redis` Policy on
 every cluster but the hub), Submariner, the sample models and Argo CD's cluster
-registration still go to every managed cluster, site or not.
+registration still go to every managed cluster, site or not, and ACM Search's
+collector to every one but the hub (`apps/acm/manifests/search`).
 
 ## Changing a site to ingress or combined
 

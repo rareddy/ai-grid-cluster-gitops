@@ -214,6 +214,12 @@ After reviewing the summary, rerun the command with `--yes`. The script:
    legacy `GitOpsCluster` integration.
 10. Waits for Argo CD's cluster secret to be created.
 
+The script creates no `KlusterletAddonConfig`, so ACM installs no Search
+collector by itself. The hub's `search-collector` policy
+(`apps/acm/manifests/search`) adds it to every managed cluster but the hub
+within a minute of the import, so ACM Search indexes the new cluster. A cluster
+imported with a `KlusterletAddonConfig` keeps whatever that config says.
+
 The script is safe to rerun after a partial import. If the cluster is already
 accepted and joined, it performs no registration changes and returns after
 verifying the joined condition.
@@ -235,9 +241,11 @@ After the script succeeds, check the hub:
 kubectl --context "$HUB_CONTEXT" get managedclusters
 kubectl --context "$HUB_CONTEXT" -n openshift-gitops get placementdecisions
 kubectl --context "$HUB_CONTEXT" -n openshift-gitops get applications
+kubectl --context "$HUB_CONTEXT" -n "$CLUSTER_NAME" get managedclusteraddon search-collector
 ```
 
 The new cluster appears in the acm-models-gitops-cluster placement decision.
+Its `search-collector` add-on reports Available.
 The role placements then generate its applications: rhoai for every role,
 grid-provider-gateway and the sample model for inference and combined, maas-db
 for ingress and combined. Application names carry the cluster name.
