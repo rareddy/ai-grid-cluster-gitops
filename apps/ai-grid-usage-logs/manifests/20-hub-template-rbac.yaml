@@ -8,9 +8,10 @@
 # The propagator's own access is limited to the Policy's namespace and the target
 # ManagedCluster, which does not include the Route. `spec.hubTemplateOptions`
 # widens that to a named ServiceAccount (ACM 2.12+), and it applies to *every*
-# template in the Policy -- the credential's `fromSecret` included. Hence two
+# template in the Policy -- both credentials' `fromSecret` included. Hence two
 # Roles: the Route in redhat-ods-monitoring, which belongs to
-# apps/ai-grid-o11y's LokiStack, and the writer token in ai-grid-policies.
+# apps/ai-grid-o11y's LokiStack, and the writer and reader tokens in
+# ai-grid-policies.
 #
 # Granted narrowly on purpose: `resourceNames` pins the single object each rule
 # needs. The unpinned `list`/`watch` rules are not padding -- ACM's template
@@ -90,6 +91,10 @@ metadata:
   namespace: ai-grid-policies
   annotations:
     argocd.argoproj.io/sync-wave: "4"
+# The same ServiceAccount also resolves both credentials' `fromSecret`, which the
+# propagator would otherwise have reached on its own. The reader token joins the
+# writer's in the pinned resourceNames; both are read through the same unpinned
+# `list`/`watch` rules above, which ACM's template resolution requires anyway.
 rules:
   - apiGroups:
       - ""
@@ -97,6 +102,7 @@ rules:
       - secrets
     resourceNames:
       - usage-logs-hub-credential
+      - usage-logs-hub-read-credential
     verbs:
       - get
   - apiGroups:

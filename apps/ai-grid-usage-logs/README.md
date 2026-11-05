@@ -13,6 +13,7 @@ It renders no store, and keeps no copy of the store's settings.
 | the bucket | `manifests/obc-usage-logs-bucket.yaml` |
 | the S3 Secret it is translated into | `manifests/job-provision-loki-key.yaml` + `manifests/rbac-provision-loki-key.yaml` |
 | the writer identity | `manifests/sa-usage-logs-writer.yaml`, `clusterrole-…`, `clusterrolebinding-…` |
+| the reader identity — `get` on the same tenant, for spoke-side consumers that query the store | `manifests/sa-usage-logs-reader.yaml`, `clusterrole-…`, `clusterrolebinding-…` |
 | the Perses datasource and dashboard | `manifests/datasource-usage-logs-all.yaml`, `manifests/usage-logs-admin-dashboard.yaml` |
 
 `values.yaml` here deliberately does **not** restate any of those. The chart can
@@ -27,8 +28,8 @@ What this app adds is what that one lacks:
 | | |
 |---|---|
 | `manifests/00-loki-operator.yaml` | The Loki operator. `apps/ai-grid-o11y` renders a LokiStack but ships no Subscription, and on a dedicated hub nothing else installs one — it otherwise arrives with the RHOAI chart's `dependencies.loki`, which a hub running no RHOAI never pulls in. |
-| the chart's spoke Policy | Ships the writer token and patches each site's `DSCInitialization` with the exporter configuration. |
-| `manifests/20-hub-template-rbac.yaml` | Lets ACM resolve the Policy's hub templates: the ingest Route in `redhat-ods-monitoring`, and the credential in `ai-grid-policies`. |
+| the chart's spoke Policy | Ships the writer token, patches each site's `DSCInitialization` with the exporter configuration, and delivers the read credential — query endpoint plus read-only token — to `redhat-ai-gateway-infra` on every selected site. |
+| `manifests/20-hub-template-rbac.yaml` | Lets ACM resolve the Policy's hub templates: the ingest Route in `redhat-ods-monitoring`, and both credentials in `ai-grid-policies`. |
 
 The ingest endpoint is an ACM hub template rather than a literal, because it is
 the hub's own Route host and differs per fleet. `helm lookup` cannot supply it:
@@ -37,6 +38,7 @@ the Argo CD repo-server renders without cluster access.
 ## Mint the writer token
 
 The chart does not create it, because a ServiceAccount token is not a
+
 declarative object. ACM reads the Secret with `fromSecret` and ships
 `$ocm_encrypted` ciphertext, so the token never appears in a managed cluster's
 manifest.
@@ -53,6 +55,21 @@ Re-running rotates the token. The Policy re-resolves the Secret and each site
 picks up the new value, so rotation is the same operation as creation. The
 default lifetime is one year; `TOKEN_DURATION` overrides it, and the cluster's
 `--service-account-max-token-expiration` may cap what is actually issued.
+
+## Mint the reader token
+
+Same story, read-only identity. The Policy ships the query endpoint and this
+token to `redhat-ai-gateway-infra` on each selected site, as `usage-logs-loki`:
+
+```sh
+export HUB_CONTEXT=<hub context>
+
+apps/ai-grid-usage-logs/create-reader-token.sh
+```
+
+Rotation works the same way. The grant is `get` on the infrastructure tenant
+only — no `create` — so a leaked reader token exposes usage records but cannot
+corrupt them.
 
 ## Verify
 
@@ -77,7 +94,22 @@ kubectl --context <site> get secret hub-usage-logs-auth -n redhat-ods-monitoring
   -o jsonpath='{.metadata.name}{"\n"}'
 kubectl --context <site> get dsci default-dsci \
   -o jsonpath='{.spec.monitoring.usageLogs.exporters.otlphttp/hub.endpoint}{"\n"}'
+
+# a site's read consumer received the read credential
+kubectl --context <site> get secret usage-logs-loki -n redhat-ai-gateway-infra \
+  -o go-template='{{.metadata.name}} {{.type}}{{"\n"}}'
+
+# and it can query the hub store with it
+ENDPOINT=$(kubectl --context <site> get secret usage-logs-loki -n redhat-ai-gateway-infra \
+  -o jsonpath='{.data.LOKI_READ_ENDPOINT}' | base64 -d)
+TOKEN=$(kubectl --context <site> get secret usage-logs-loki -n redhat-ai-gateway-infra \
+  -o jsonpath='{.data.LOKI_READ_TOKEN}' | base64 -d)
+curl -sS -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $TOKEN" \
+  "${ENDPOINT}/loki/api/v1/labels"
 ```
+
+`200` from the labels query means the read path works end to end; `403` means
+the token is valid Kubernetes-wise but the reader identity's grant is missing.
 
 A record pushed at a site collector's receiver should arrive in the hub store
 with `cluster_name`, `model` and `service_name` promoted as stream labels.
