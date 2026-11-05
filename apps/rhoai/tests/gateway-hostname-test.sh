@@ -60,7 +60,8 @@ source = next(item for item in sources if item.get("path") == "apps/rhoai/gatewa
 assert source["helm"]["valueFiles"] == ["$values/apps/rhoai/values.yaml"]
 parameters = {parameter["name"]: parameter["value"]
               for parameter in source["helm"]["parameters"]}
-assert parameters == {"clusterNamespace": "{{ .name }}"}
+assert parameters == {"clusterNamespace": "{{ .name }}",
+                      "role": '{{ index .metadata.labels "ai-grid/role" }}'}
 differences = next(item for item in appset["spec"]["template"]["spec"]["ignoreDifferences"]
                    if item.get("kind") == "Gateway")
 assert differences["jqPathExpressions"] == [
@@ -70,4 +71,10 @@ assert differences["jqPathExpressions"] == [
 ]
 PY
 
-echo "gateway-hostname tests: 1 ok, 0 failed"
+# An inference-only site has no MaaS Gateway: nothing renders there.
+inference_objects=$(helm template rhoai-gateway-hostname "$HERE/../gateway-hostname" \
+  -f "$HERE/../values.yaml" --set clusterNamespace=target-cluster --set role=inference |
+  grep -c '^kind:' || true)
+[ "$inference_objects" = 0 ] || { echo "gateway-hostname renders $inference_objects objects for role inference" >&2; exit 1; }
+
+echo "gateway-hostname tests: 2 ok, 0 failed"

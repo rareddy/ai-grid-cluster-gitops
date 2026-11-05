@@ -124,6 +124,10 @@ spec:
               - name: clusterNamespace
                 value: '{{ .name }}'
                 forceString: true
+              # An inference-only site has no MaaS Gateway: the chart renders nothing there.
+              - name: role
+                value: '{{ index .metadata.labels "ai-grid/role" }}'
+                forceString: true
         - repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
           targetRevision: nov4
           path: apps/rhoai/catalog

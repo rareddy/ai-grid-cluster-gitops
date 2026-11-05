@@ -1,3 +1,4 @@
+{{- if ne (.Values.role | default "") "inference" }}
 {{- $gateway := .Values.components.aigateway.modelsAsAService.gateway }}
 {{- $hostnamePrefix := index $gateway.annotations "ai-grid/maas-gateway-hostname-prefix" }}
 {{- if not $hostnamePrefix }}{{ fail "components.aigateway.modelsAsAService.gateway.annotations.ai-grid/maas-gateway-hostname-prefix is required" }}{{ end }}
@@ -35,3 +36,4 @@ spec:
                   - group: ""
                     kind: Secret
                     name: '{{ "{{" }} get (get (lookup "operator.openshift.io/v1" "IngressController" "openshift-ingress-operator" "default").spec "defaultCertificate" | default dict) "name" | default "router-certs-default" {{ "}}" }}'
+{{- end }}
