@@ -53,6 +53,9 @@ Optional environment:
                   Route. Must be the tenant root --
                   https://<host>/api/logs/v1/infrastructure, without /otlp --
                   because the consumer appends the Loki API paths itself.
+                  Validated like the derived value: the script refuses to write
+                  an endpoint that is not https, carries /otlp, or is not the
+                  tenant root.
 EOF
 }
 
@@ -108,6 +111,17 @@ fi
 case "$endpoint" in
   https://*) ;;
   *) die "endpoint does not start with https://: $endpoint" ;;
+esac
+# The same mistakes the chart's Helm validation used to catch, moved here because
+# this Secret is now the only source of the endpoint: a /otlp suffix is the ingest
+# route (every query 404s), and any other path is not the tenant root the consumer
+# appends the Loki API paths to.
+case "$endpoint" in
+  */otlp|*/otlp/*) die "endpoint must not contain /otlp: that is the ingest route, which answers every query with 404. The query endpoint is the tenant root https://<host>/api/logs/v1/infrastructure (got: $endpoint)" ;;
+esac
+case "$endpoint" in
+  https://*/api/logs/v1/infrastructure) ;;
+  *) die "endpoint must be the tenant root https://<host>/api/logs/v1/infrastructure, without a query or fragment (got: $endpoint)" ;;
 esac
 
 # Declarative, so it cannot collide with Argo CD creating the same namespace
