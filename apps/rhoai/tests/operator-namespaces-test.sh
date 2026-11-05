@@ -42,7 +42,7 @@ fi
 helm dependency build "$CHART" >/dev/null
 render() { # role loki-create rhoai-create -> writes $T/out.json {namespaces: [...], loki_subscription_ns: ...}
   helm template rhai-on-openshift "$CHART" -f "$HERE/../values.yaml" -f "$HERE/../roles/$1.yaml" \
-    --set grid-enrollment.enabled=false --set praxis-gateway.grid.siteName=site \
+    --set praxis-gateway.grid.siteName=site \
     --set praxis-provider-gateway.grid.siteName=site \
     --set "dependencies.loki.olm.createNamespace=$2" --set "operator.rhoai.olm.createNamespace=$3" \
   | python3 -c 'import sys, yaml, json

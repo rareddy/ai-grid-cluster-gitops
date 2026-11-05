@@ -56,7 +56,7 @@ done
 
 render() {
   helm template rhai-on-openshift "$CHART" -f "$1" -f "$2" \
-    --set skipCrdCheck=true --set grid-enrollment.enabled=false \
+    --set skipCrdCheck=true \
     --set praxis-gateway.grid.siteName=site \
     --set praxis-provider-gateway.grid.siteName=site > "$3"
 }
