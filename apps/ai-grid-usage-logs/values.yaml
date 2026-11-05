@@ -93,13 +93,6 @@ spokePolicy:
   readCredential:
     enabled: true
 
-    # Same hub template as the ingest endpoint, minus /otlp: the query API hangs
-    # off the tenant root, and the consumer appends the Loki API paths itself.
-    # The `lookup` reads the same Route the ingest endpoint's does, so the same
-    # hubTemplateOptions ServiceAccount and the same RBAC in
-    # manifests/20-hub-template-rbac.yaml cover it.
-    endpoint: '{{hub printf "https://%s/api/logs/v1/infrastructure" (index (lookup "route.openshift.io/v1" "Route" "redhat-ods-monitoring" "usage-logs").status.ingress 0).host hub}}'
-
     # Minted into this hub Secret by create-reader-token.sh, for the reader
     # identity apps/ai-grid-o11y owns. The templating ServiceAccount reads it
     # through the pinned resourceNames in manifests/20-hub-template-rbac.yaml.
