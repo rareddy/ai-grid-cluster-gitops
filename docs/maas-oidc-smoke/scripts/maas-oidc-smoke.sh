@@ -15,7 +15,12 @@ Environment overrides:
                          KEYCLOAK_REDIRECT_URI from the Keycloak secret.
   ASSUME_YES             Set to 1 to proceed without the inference and
                          rate-limit approval prompts.
-  GATEWAY_HOST          MaaS Gateway hostname. Defaults to the Gateway status address.
+  GATEWAY_HOST          MaaS Gateway hostname used for the HTTP Host header.
+                         Defaults to the listener hostname for GATEWAY_PROTOCOL,
+                         then the Gateway status address.
+  GATEWAY_CONNECT_ADDRESS
+                         Address curl connects to. Defaults to the Gateway
+                         status address, then GATEWAY_HOST. May include a port.
   GATEWAY_PROTOCOL      Gateway protocol. Defaults to http.
   KEYCLOAK_NAMESPACE    Namespace containing the Keycloak secret. Defaults to maas-db.
   KEYCLOAK_SECRET_NAME  Secret containing Keycloak runtime values. Defaults to keycloak-secrets.
@@ -136,6 +141,11 @@ gateway_name="${GATEWAY_NAME:-maas-default-gateway}"
 gateway_kube_context="${GATEWAY_KUBE_CONTEXT:-}"
 client_id="${OIDC_CLIENT_ID:-tenant-demo}"
 gateway_protocol="${GATEWAY_PROTOCOL:-http}"
+gateway_port=80
+case "$gateway_protocol" in
+  http) gateway_port=80 ;;
+  https) gateway_port=443 ;;
+esac
 redirect_uri="${REDIRECT_URI:-}"
 inference_prompt="${INFERENCE_PROMPT:-Reply with: MaaS OIDC inference succeeded.}"
 inference_max_tokens="${INFERENCE_MAX_TOKENS:-32}"
@@ -177,20 +187,67 @@ password=$(
 [[ -n "$password" ]] || fail "$password_key is empty in $keycloak_secret_name"
 keycloak_url="${keycloak_url%/}"
 
+gateway_kubectl_args=()
+if [[ -n "$gateway_kube_context" ]]; then
+  gateway_kubectl_args=(--context "$gateway_kube_context")
+fi
+
+gateway_json=""
+if [[ -z "${GATEWAY_HOST:-}" || -z "${GATEWAY_CONNECT_ADDRESS:-}" ]]; then
+  if ! gateway_json=$(
+    kubectl "${gateway_kubectl_args[@]}" get gateway "$gateway_name" -n "$gateway_namespace" -o json 2>/dev/null
+  ); then
+    if [[ -n "${GATEWAY_HOST:-}" && -z "${GATEWAY_CONNECT_ADDRESS:-}" ]]; then
+      gateway_json=""
+    else
+      fail "could not read MaaS Gateway ${gateway_namespace}/${gateway_name}"
+    fi
+  fi
+fi
+
 if [[ -n "${GATEWAY_HOST:-}" ]]; then
   gateway_host="$GATEWAY_HOST"
 else
-  gateway_kubectl_args=()
-  if [[ -n "$gateway_kube_context" ]]; then
-    gateway_kubectl_args=(--context "$gateway_kube_context")
-  fi
   gateway_host=$(
-    kubectl "${gateway_kubectl_args[@]}" get gateway "$gateway_name" -n "$gateway_namespace" \
-      -o jsonpath='{.status.addresses[0].value}'
+    jq -r --arg protocol "$gateway_protocol" '
+      [
+        .spec.listeners[]?
+        | select(((.protocol // .name // "") | ascii_downcase) == $protocol)
+        | .hostname // empty
+        | select(. != "")
+      ][0] // empty
+    ' <<<"$gateway_json"
   )
+  if [[ -z "$gateway_host" ]]; then
+    gateway_host=$(
+      jq -r '[.status.addresses[]?.value // empty | select(. != "")][0] // empty' <<<"$gateway_json"
+    )
+  fi
 fi
+
+if [[ -n "${GATEWAY_CONNECT_ADDRESS:-}" ]]; then
+  gateway_connect_address="$GATEWAY_CONNECT_ADDRESS"
+else
+  gateway_connect_address=$(
+    jq -r '[.status.addresses[]?.value // empty | select(. != "")][0] // empty' <<<"$gateway_json"
+  )
+  if [[ -z "$gateway_connect_address" ]]; then
+    gateway_connect_address="$gateway_host"
+  fi
+fi
+
 [[ -n "$gateway_host" ]] || fail "could not determine the MaaS Gateway hostname"
+[[ -n "$gateway_connect_address" ]] || fail "could not determine the MaaS Gateway connect address"
+[[ "$gateway_host" != *"://"* && "$gateway_host" != *"/"* ]] ||
+  fail "GATEWAY_HOST must be a hostname, not a URL"
+[[ "$gateway_connect_address" != *"://"* && "$gateway_connect_address" != *"/"* ]] ||
+  fail "GATEWAY_CONNECT_ADDRESS must be a host or host:port, not a URL"
+
 base_url="${gateway_protocol}://${gateway_host}"
+
+gateway_curl() {
+  curl --connect-to "${gateway_host}:${gateway_port}:${gateway_connect_address}" "$@"
+}
 
 umask 077
 tmpdir=$(mktemp -d)
@@ -203,6 +260,7 @@ print_section "Runtime configuration"
 printf '  user: %s\n' "$user"
 printf '  Keycloak issuer: %s\n' "$keycloak_url/realms/saas"
 printf '  Gateway host: %s\n' "$gateway_host"
+printf '  Gateway connect address: %s\n' "$gateway_connect_address"
 printf '  Gateway context: %s\n' "${gateway_kube_context:-current}"
 printf '  Gateway: %s\n' "$base_url"
 printf '  OIDC client: %s\n' "$client_id"
@@ -299,7 +357,7 @@ fi
 
 me_response="$tmpdir/me-response.json"
 me_status=$(
-  curl -sS --max-time 20 \
+  gateway_curl -sS --max-time 20 \
     -H "Authorization: Bearer $(cat "$token_file")" \
     -o "$me_response" -w '%{http_code}' \
     "$base_url/v1/me"
@@ -320,7 +378,7 @@ done < <(jq -r '."https://redhat.com/maas/orgs"[]? | [.organization_id, (.roles 
 
 subscriptions_response="$tmpdir/subscriptions-response.json"
 subscriptions_status=$(
-  curl -sS --max-time 20 \
+  gateway_curl -sS --max-time 20 \
     -H "Authorization: Bearer $(cat "$token_file")" \
     -o "$subscriptions_response" -w '%{http_code}' \
     "$base_url/v1/subscriptions"
@@ -370,7 +428,7 @@ if (( owner_subscription_count > 0 )); then
 
   api_key_response="$tmpdir/api-key-response.json"
   api_key_status=$(
-    curl -sS --max-time 20 \
+    gateway_curl -sS --max-time 20 \
       -H "Authorization: Bearer $(cat "$token_file")" \
       -H 'Content-Type: application/json' \
       -d "$api_key_request" \
@@ -411,7 +469,7 @@ api_key_list_request=$(jq -n '{
 
 api_key_list_response="$tmpdir/api-key-list-response.json"
 api_key_list_status=$(
-  curl -sS --max-time 20 \
+  gateway_curl -sS --max-time 20 \
     -H "Authorization: Bearer $(cat "$token_file")" \
     -H 'Content-Type: application/json' \
     -d "$api_key_list_request" \
@@ -484,7 +542,7 @@ Prompt: $inference_prompt" || fail "inference request was not approved"
 
     completions_response="$tmpdir/completions-response.json"
     completions_status=$(
-      curl -sS --max-time 60 \
+      gateway_curl -sS --max-time 60 \
         -H "Authorization: Bearer $(cat "$api_key_file")" \
         -H 'Content-Type: application/json' \
         -d "$completions_request" \
@@ -562,7 +620,7 @@ subsequent probes expect HTTP 429." ||
 
       rate_limit_exhaust_response="$tmpdir/rate-limit-exhaust-response.json"
       rate_limit_exhaust_status=$(
-        curl -sS --max-time 60 \
+        gateway_curl -sS --max-time 60 \
           -H "Authorization: Bearer $(cat "$api_key_file")" \
           -H 'Content-Type: application/json' \
           -d "$rate_limit_exhaust_request" \
@@ -602,7 +660,7 @@ subsequent probes expect HTTP 429." ||
 
           rate_limit_probe_response="$tmpdir/rate-limit-probe-response.json"
           rate_limit_probe_status=$(
-            curl -sS --max-time 60 \
+            gateway_curl -sS --max-time 60 \
               -H "Authorization: Bearer $(cat "$api_key_file")" \
               -H 'Content-Type: application/json' \
               -d "$rate_limit_probe_request" \
