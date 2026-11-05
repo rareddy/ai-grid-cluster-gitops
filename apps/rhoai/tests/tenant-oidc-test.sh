@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Checks OIDC credentials for AITenant and its native consumer portal, plus hub-template access.
+# Checks the AITenant OIDC Secret namespace and hub-template add-on contract.
 # Needs PyYAML.
 set -Eeuo pipefail
 
@@ -14,11 +14,20 @@ rbac_documents = list(yaml.safe_load_all(open(sys.argv[2])))
 templates = [template["objectDefinition"] for template in policy["spec"]["policy-templates"]]
 secret_policy = next(template for template in templates
                       if template.get("metadata", {}).get("name") == "rhoai-tenant-oidc-client-secret")
-assert set(secret_policy["spec"]["namespaceSelector"]["include"]) == {"ai-tenants", "models-as-a-service"}
-secret = secret_policy["spec"]["object-templates"][0]["objectDefinition"]
-assert "namespace" not in secret["metadata"], "let namespaceSelector deliver the Secret to both consumers"
+# ai-gateway-controller reads spec.oidc.clientSecretRef in the AITenant's tenant
+# namespace (status.tenantNamespace): the namespace of the MaasTenantConfig that
+# rhoai-maastenantconfig creates. The Secret goes there, and only there.
+config_policy = next(template for template in templates
+                     if template.get("metadata", {}).get("name") == "rhoai-maastenantconfig")
+config = next(t["objectDefinition"] for t in config_policy["spec"]["object-templates"]
+              if t["objectDefinition"].get("kind") == "MaasTenantConfig")
+tenant_namespace = config["metadata"]["namespace"]
+secrets = [t["objectDefinition"] for t in secret_policy["spec"]["object-templates"]]
+assert [s["metadata"]["namespace"] for s in secrets] == [tenant_namespace], secrets
+assert secret_policy["spec"]["namespaceSelector"]["include"] == [tenant_namespace]
+secret = secrets[0]
 assert secret["metadata"]["name"] == "tenant-demo-oidc-client"
-assert secret["data"]["clientSecret"] == "{{hub fromSecret \"maas-db\" \"keycloak-secrets\" \"KEYCLOAK_CLIENT_SECRET\" hub}}"
+assert set(secret["data"]) == {"clientSecret"}
 
 tenant_policy = next(template for template in templates
                       if template.get("metadata", {}).get("name") == "rhoai-aitenant")
