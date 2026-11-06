@@ -114,6 +114,8 @@ spec:
                 metadata:
                   name: models-as-a-service
                   namespace: ai-tenants
+                  annotations:
+                    maas.opendatahub.io/retain-api-keys-on-delete: "true"
                 spec:
                   gateway:
                     name: maas-default-gateway
