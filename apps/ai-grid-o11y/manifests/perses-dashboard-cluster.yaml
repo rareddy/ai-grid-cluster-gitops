@@ -451,6 +451,111 @@ spec:
                     </dd>
                   </div>
                 </dl>
+      # Grid gateway stats
+      gridGatewaysReporting:
+        kind: Panel
+        spec:
+          display:
+            name: Grid gateways reporting
+            description: >-
+              Clusters whose grid gateway exported metrics in the last scrape. A site that serves models but routes nothing runs no gateway and does not count.
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format:
+                unit: decimal
+                decimalPlaces: 0
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: cluster-prometheus-datasource
+                    query: >-
+                      count(count by (cluster) (grid_dial_down{cluster=~"$cluster_name"})) or vector(0)
+                    seriesNameFormat: Grid gateways reporting
+      gridBackendsUnreachable:
+        kind: Panel
+        spec:
+          display:
+            name: Grid backends unreachable
+            description: >-
+              Candidates a grid gateway cannot dial right now, summed over the selected clusters. Requests for those models go to the remaining candidates.
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format:
+                unit: decimal
+                decimalPlaces: 0
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: cluster-prometheus-datasource
+                    query: >-
+                      sum(grid_dial_down{cluster=~"$cluster_name"}) or vector(0)
+                    seriesNameFormat: Grid backends unreachable
+      gridCandidatesWithoutRoute:
+        kind: Panel
+        spec:
+          display:
+            name: Grid candidates without a route
+            description: >-
+              Candidates in a gateway's serving config it has no way to reach, with no address yet or a dial the site's policy refused. These never receive requests.
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format:
+                unit: decimal
+                decimalPlaces: 0
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: cluster-prometheus-datasource
+                    query: >-
+                      (sum(grid_serving_undialable_clusters{cluster=~"$cluster_name"}) or vector(0)) + (sum(grid_serving_refused_dial_clusters{cluster=~"$cluster_name"}) or vector(0))
+                    seriesNameFormat: Grid candidates without a route
+      gridLoadReadingFetchSuccess:
+        kind: Panel
+        spec:
+          display:
+            name: Grid load reading fetch success rate
+            description: >-
+              Share of the gateways' fetches of peer sites' load readings that succeeded. Below 100% a peer is routed on its last good reading until it answers again.
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format:
+                unit: percent-decimal
+                decimalPlaces: 1
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: cluster-prometheus-datasource
+                    query: >-
+                      sum(rate(grid_signals_poll_total{result="ok",cluster=~"$cluster_name"}[$__rate_interval])) / (sum(rate(grid_signals_poll_total{cluster=~"$cluster_name"}[$__rate_interval])) > 0)
+                    seriesNameFormat: Grid load reading fetch success rate
     layouts:
       # Overview Section - Stats Row
       - kind: Grid
@@ -484,6 +589,38 @@ spec:
               height: 4
               content:
                 '$ref': '#/spec/panels/successRate'
+      # Grid gateway Section - Stats Row
+      - kind: Grid
+        spec:
+          display:
+            title: Grid gateway
+            collapse:
+              open: true
+          items:
+            - x: 0
+              'y': 0
+              width: 6
+              height: 4
+              content:
+                '$ref': '#/spec/panels/gridGatewaysReporting'
+            - x: 6
+              'y': 0
+              width: 6
+              height: 4
+              content:
+                '$ref': '#/spec/panels/gridBackendsUnreachable'
+            - x: 12
+              'y': 0
+              width: 6
+              height: 4
+              content:
+                '$ref': '#/spec/panels/gridCandidatesWithoutRoute'
+            - x: 18
+              'y': 0
+              width: 6
+              height: 4
+              content:
+                '$ref': '#/spec/panels/gridLoadReadingFetchSuccess'
       # Cluster-wide usage section
       - kind: Grid
         spec:
