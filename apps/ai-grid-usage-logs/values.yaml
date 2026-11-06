@@ -119,6 +119,7 @@ spokePolicy:
     # than replace it, and the Placement would then match nothing.
     excludeLocalCluster: true
     matchLabels:
+      ai-grid.redhat.com/maas: null
       ai-grid/role: combined
 
   spoke:
