@@ -9,14 +9,10 @@ metadata:
     app.kubernetes.io/name: keycloak
 spec:
   replicas: 1
-  # The old pod stops before the new one imports: an overwrite import deletes
-  # and re-creates realms in the shared database, which a pod still serving
-  # them must not see.
+  # Every realm is imported only when it doesn't exist, so a new pod changes
+  # no realm while the old one serves: roll without a gap.
   strategy:
-    type: Recreate
-    # Clear the default rollingUpdate settings an existing Deployment still carries;
-    # without this, apply fails with "rollingUpdate: Forbidden ... when strategy type is 'Recreate'".
-    rollingUpdate: null
+    type: RollingUpdate
   selector:
     matchLabels:
       app.kubernetes.io/name: keycloak
@@ -36,11 +32,11 @@ spec:
             - |
               set -Eeuo pipefail
 
-              # keycloak-realm-import holds realms imported only when they
-              # don't exist (create-only), such as saas, whose runtime data
-              # must survive a restart; keycloak-saas-realm-sync applies Git
-              # edits to it. A component may mount realms wholly defined in
-              # Git at realm-overwrite-source; they are rebuilt on every start.
+              # keycloak-realm-import holds every realm, imported only when it
+              # doesn't exist (create-only): saas and the example tenant IdP
+              # realms hold runtime data (organizations, users, groups) that
+              # must survive a restart. keycloak-saas-realm-sync applies Git
+              # edits to saas.
               render_dir() {
                 local source_dir=$1 target_dir=$2 source
                 mkdir -p "$target_dir"
@@ -51,7 +47,6 @@ spec:
               }
 
               render_dir /opt/keycloak/realm-import-source /opt/keycloak/data/import/create-only
-              render_dir /opt/keycloak/realm-overwrite-source /opt/keycloak/data/import/overwrite
           envFrom:
             - secretRef:
                 name: keycloak-secrets
@@ -86,9 +81,6 @@ spec:
           args:
             - |
               set -Eeuo pipefail
-              if compgen -G '/opt/keycloak/data/import/overwrite/*.json' >/dev/null; then
-                /opt/keycloak/bin/kc.sh import --dir /opt/keycloak/data/import/overwrite --override true
-              fi
               /opt/keycloak/bin/kc.sh import --dir /opt/keycloak/data/import/create-only --override false
               exec /opt/keycloak/bin/kc.sh start
           ports:

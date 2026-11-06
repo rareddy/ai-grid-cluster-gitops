@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Renders every Keycloak overlay and checks the realm import contract
-# (realm-import-test.py), then runs the rendered init container script: saas
-# goes to the create-only import, the example IdP realms to the overwrite
-# import, and the sync hook renders saas with only the values it is given.
+# (realm-import-test.py), then runs the rendered init container script: every
+# realm goes to the create-only import, and the sync hook renders saas with only
+# the values it is given.
 # Needs kubectl and PyYAML.
 set -Eeuo pipefail
 
@@ -48,14 +48,13 @@ for overlay in core default; do
     bash "$TMP_DIR/$overlay/init.sh"
   )
   import_dir=$TMP_DIR/$overlay/opt/keycloak/data/import
-  [[ "$(cd "$import_dir/create-only" && ls)" == "saas-realm.json" ]]
+  [[ "$(ls -A "$import_dir")" == "create-only" ]]
   check_rendered "$import_dir"/create-only/*.json
   grep -q '"secret": "test-KEYCLOAK_REALM_SYNC_CLIENT_SECRET"' "$import_dir/create-only/saas-realm.json"
 done
-[[ -z "$(ls -A "$TMP_DIR/core/opt/keycloak/data/import/overwrite")" ]]
-[[ "$(cd "$TMP_DIR/default/opt/keycloak/data/import/overwrite" && ls | tr '\n' ' ')" == \
-  "grid-tenant-1-idp-realm.json grid-tenant-2-idp-realm.json " ]]
-check_rendered "$TMP_DIR"/default/opt/keycloak/data/import/overwrite/*.json
+[[ "$(cd "$TMP_DIR/core/opt/keycloak/data/import/create-only" && ls | tr '\n' ' ')" == "saas-realm.json " ]]
+[[ "$(cd "$TMP_DIR/default/opt/keycloak/data/import/create-only" && ls | tr '\n' ' ')" == \
+  "grid-tenant-1-idp-realm.json grid-tenant-2-idp-realm.json saas-realm.json " ]]
 
 # The sync hook's render, with only the values its Job gets: it renders saas,
 # and fails when one of them is missing.

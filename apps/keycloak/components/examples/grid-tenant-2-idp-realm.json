@@ -38,9 +38,10 @@
         {
           "name": "MaaS roles",
           "protocol": "openid-connect",
-          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
           "config": {
-            "user.attribute": "maas_roles",
+            "usermodel.clientRoleMapping.clientId": "saas-broker",
+            "usermodel.clientRoleMapping.rolePrefix": "",
             "claim.name": "roles",
             "jsonType.label": "String",
             "multivalued": "true",
@@ -86,6 +87,14 @@
       }
     ]
   },
+  "roles": {
+    "client": {
+      "saas-broker": [
+        { "name": "admins", "description": "Administers the organization in AI Grid: sent in the roles claim." },
+        { "name": "users", "description": "Uses the organization's models in AI Grid: sent in the roles claim." }
+      ]
+    }
+  },
   "groups": [
     { "name": "ai-grid-users" }
   ],
@@ -101,8 +110,8 @@
       "groups": [
         "/ai-grid-users"
       ],
-      "attributes": {
-        "maas_roles": ["users"]
+      "clientRoles": {
+        "saas-broker": ["users"]
       },
       "credentials": [
         {
@@ -120,8 +129,9 @@
       "enabled": true,
       "firstName": "Carol",
       "lastName": "Tenant",
-      "attributes": {
-        "maas_roles": ["admins"]
+      "clientRoles": {
+        "saas-broker": ["admins"],
+        "realm-management": ["view-users", "query-users", "query-groups", "query-clients", "manage-users"]
       },
       "credentials": [
         {

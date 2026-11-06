@@ -47,10 +47,11 @@ The direct installer creates namespace `maas-db` when it does not exist.
   and database without sharing credentials with the API database user.
 - Keycloak connects to `maas-db-rw` with TLS and verifies the server against
   the existing `maas-db-ca` Secret.
-- The default install imports the core `saas` broker realm when it does not
-  exist, and rebuilds the example `grid-tenant-1-idp` and `grid-tenant-2-idp`
-  realms from Git on every start. The `core` overlay excludes the examples. See
-  [Realm Imports and Git Edits](#realm-imports-and-git-edits).
+- The default install imports the core `saas` broker realm and the example
+  `grid-tenant-1-idp` and `grid-tenant-2-idp` realms, each when it does not
+  exist. The `core` overlay excludes the examples. See
+  [Realm Imports and Git Edits](#realm-imports-and-git-edits) and
+  [Example Tenant Identity Providers](#example-tenant-identity-providers).
 - The upstream example `AITenant` resource is intentionally not applied by this
   app; the tenant-facing application should own its consumer configuration.
 
@@ -108,9 +109,11 @@ which this app depends on for its database.
 
 Removing an explicit host from an existing Route can change the assigned public
 URL. Plan the corresponding Keycloak realm and client update before relying on
-the new issuer: a restart rebuilds the example IdP realms, but the `saas`
-realm, which already exists in PostgreSQL, keeps its identity providers' URLs
-until `keycloak-saas-realm-sync` next runs, on the Application's next sync.
+the new issuer: the realms already exist in PostgreSQL. `saas` keeps its
+identity providers' URLs until `keycloak-saas-realm-sync` next runs, on the
+Application's next sync; the example tenant realms keep their client's redirect
+URIs until they are imported again (see
+[Example Tenant Identity Providers](#example-tenant-identity-providers)).
 
 ## Consumer Portal Redirects
 
@@ -154,28 +157,20 @@ file holds needs its value; one it doesn't hold needs none.
 
 ## Realm Imports and Git Edits
 
-The `render-realm-import` init container renders the realm files into two
-directories, and the Keycloak container imports each before `kc.sh start`:
+The `render-realm-import` init container renders the realm files of
+`keycloak-realm-import`, and the Keycloak container imports them with
+`kc.sh import --override false` before `kc.sh start`: each realm is created on
+the first start only, and a restart, node drain or eviction leaves it as it is.
+Every realm holds runtime data:
 
-- `keycloak-realm-import` (base, and the examples component's `saas-realm.json`)
-  holds `saas`, which holds runtime data: the console backend's user
-  (`apps/console/create-secrets.sh`), the organizations the console creates
-  with their identity providers, and brokered users.
-  `kc.sh import --override false` creates it on the first start only; a
-  restart, node drain or eviction leaves it as it is. A realm added to this
-  ConfigMap is create-only too.
-- `keycloak-realm-overwrite` (examples component only) holds the
-  `grid-tenant-1-idp` and `grid-tenant-2-idp` example tenant IdPs, defined
-  wholly in Git. `kc.sh import --override true` deletes and rebuilds them on
-  every start, so an edit to their files takes effect on the next restart and
-  anything created in them at runtime is lost. Each of their users has a fixed
-  `id` in the file: it is the `sub` that `saas` links a brokered user to, so a
-  rebuild must not change it. The `core` overlay has none.
+- `saas` (base, or the examples component's `saas-realm.json`): the console
+  backend's user (`apps/console/create-secrets.sh`), the organizations the
+  console creates with their identity providers, and brokered users.
+- `grid-tenant-1-idp` and `grid-tenant-2-idp` (examples component only): the
+  users, groups and roles their organization's admin manages. The `core`
+  overlay has none.
 
-The Deployment uses the `Recreate` strategy: the old pod stops before the new
-one imports, so no pod serves a realm while an overwrite import deletes and
-re-creates it in the shared database. A rollout has a few seconds without
-Keycloak.
+A new pod imports nothing that exists, so the Deployment rolls without a gap.
 
 An edit to `saas-realm.json` reaches an existing realm through two Argo CD
 PostSync hooks, which run in sync-wave order after every sync of this
@@ -200,7 +195,6 @@ Keycloak Deployment is healthy:
 | Clients the realm has | Updates each in place, on top of the live client: same id, so its sessions stay. Its protocol mappers become the file's, so a mapper removed from the file is deleted; client scopes the file lists are added. The `tenant-demo` client's redirect URIs stay as the CronJob set them. |
 | Identity providers and identity provider mappers the realm has | Updates each in place: same id, so organization links and brokered users' links stay. Config keys the file doesn't set stay. |
 | Identity provider mappers | Deletes the mappers of the file's identity providers that the file doesn't have. Identity providers the file doesn't have, such as the console's organizations', keep all of theirs. |
-| The example tenant IdP realms' users (examples component) | A brokered user whose `grid-tenant-*` link points at a user id the rebuilt realm no longer has is linked again to the file's fixed id, with the same username. The `saas` user keeps its id, organizations and sessions. This repairs the links of a realm whose tenant users predate the fixed ids, on the first sync after them. |
 | Service-account users | Grants the roles the file gives them. |
 
 A partial import with `ifResourceExists: OVERWRITE` isn't used: it deletes and
@@ -251,12 +245,59 @@ stays for its logs until the next sync replaces it.
 `overlays/direct` (`install.sh`, without Argo CD) leaves both hooks out:
 `kubectl apply` would start them in no order and couldn't update them later.
 A direct install imports `saas` on the first start; apply later edits to it
-with a planned export/import or the admin API. It still rebuilds the example
-tenant IdP realms on every start. On a direct install whose tenant users
-predate their fixed ids, a brokered user's first sign-in after the update finds
-its link stale ("Account already exists"): delete that user's `grid-tenant-*`
-identity provider link in `saas` (Users, the user, Identity provider links) and
-add it again with the file's user id and username.
+with a planned export/import or the admin API.
+
+## Example Tenant Identity Providers
+
+`grid-tenant-1-idp` and `grid-tenant-2-idp` stand in for organizations' own
+identity providers, which AI Grid never manages: in production that is the
+organization's Keycloak, Okta, Entra ID or similar. Each realm's `saas-broker`
+client sends what any such provider must send in the ID token
+(ODH-ADR-MS-0007), from what the realm's admin manages:
+
+| Claim | From |
+| --- | --- |
+| `groups` | The user's groups (Group Membership mapper, group names without their path). |
+| `roles` | The user's roles of the `saas-broker` client: `admins` or `users`. |
+
+No claim value is a user attribute. `saas`'s identity provider mappers copy the
+two claims on every sign-in (sync mode Force), so a change takes effect at the
+user's next sign-in.
+
+| Realm | User | Groups | Roles | Administers the realm |
+| --- | --- | --- | --- | --- |
+| `grid-tenant-1-idp` | `alice` | `ai-grid-admins`, `ai-grid-users` | `admins` | yes |
+| `grid-tenant-2-idp` | `bob` | `ai-grid-users` | `users` | no |
+| `grid-tenant-2-idp` | `carol` | | `admins` | yes |
+
+Each organization's admin holds the realm's `realm-management` roles
+`view-users`, `query-users`, `query-groups`, `query-clients` and
+`manage-users`, and nothing more. In the realm's admin console,
+`<KEYCLOAK_PUBLIC_URL>/admin/<realm>/console/`, they create and delete users,
+manage group membership, and grant or remove the `saas-broker` roles. They can
+also grant these same roles to another user, who then administers the realm
+too; they can't change the realm, its clients or their secrets. A
+subscription in the provider console is granted to group names, such as
+`ai-grid-users`.
+
+Every user in the files has a fixed `id`: it is the `sub` that `saas` links
+the user's brokered account to.
+
+Keycloak imports these realms once, so an edit to their files doesn't reach a
+hub where they exist. To apply one on a test hub, delete the realm (realm
+settings, Action, Delete) and restart Keycloak
+(`kubectl rollout restart deployment/keycloak -n maas-db`): the realm is
+imported again from Git, and the users in the files keep their ids, so their
+links in `saas` stay. Anything the realm's admin created in it is lost.
+
+On a hub whose tenant realms were imported before their users had fixed ids,
+those users get new ids at that import, and each one's link in `saas` still
+points at the old id: their next sign-in stops at "Account already exists".
+For each of them, in realm `saas`: Users, the user, Identity provider links,
+unlink `grid-tenant-*`, then link it again with the user id from the realm file
+and the same username. Deleting the link alone isn't enough: the next sign-in
+then finds the existing `saas` user by email and asks for a password a brokered
+user doesn't have.
 
 ## Validation
 
