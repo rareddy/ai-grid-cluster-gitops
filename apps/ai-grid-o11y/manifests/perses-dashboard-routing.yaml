@@ -69,7 +69,7 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Requests decided (requests/sec)
+            name: Decision rate (requests/sec)
             description: Requests this gateway decided per second, routed or refused.
           plugin:
             kind: StatChart
@@ -90,7 +90,7 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Refused
+            name: Refusal rate
             description: 'Share of decisions answered without routing: no ready site, no route, a bad request, or shed. A request that names no model, such as GET /v1/models from a client health check,
               counts as a bad request.'
           plugin:
@@ -113,8 +113,8 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Sent to a demoted site
-            description: Share of decisions that went to a demoted site because no healthy site was left.
+            name: Fallback rate
+            description: Share of requests routed to a site the gateway had marked unhealthy, because no healthy site served the model.
           plugin:
             kind: StatChart
             spec:
@@ -195,50 +195,6 @@ spec:
                 spec:
                   datasource: *id001
                   query: max(grid_route_site_reading_age_seconds{site=~"$site",backend=~"$backend",cluster=~"$cluster_name"})
-      kvCacheHit:
-        kind: Panel
-        spec:
-          display:
-            name: KV cache hit
-            description: Share of prompt tokens the serving engines found in their prefix cache, as vLLM reports it, across every engine this Prometheus scrapes.
-          plugin:
-            kind: StatChart
-            spec:
-              calculation: last-number
-              format:
-                unit: percent-decimal
-                decimalPlaces: 1
-          queries:
-          - kind: TimeSeriesQuery
-            spec:
-              plugin:
-                kind: PrometheusTimeSeriesQuery
-                spec:
-                  datasource: *id001
-                  query: sum(rate({__name__=~"kserve_vllm:prefix_cache_hits(_total)?|vllm:prefix_cache_hits(_total)?",cluster=~"$cluster_name"}[$__rate_interval])) / (sum(rate({__name__=~"kserve_vllm:prefix_cache_queries(_total)?|vllm:prefix_cache_queries(_total)?",cluster=~"$cluster_name"}[$__rate_interval]))
-                    > 0)
-      kvCacheHitPredicted:
-        kind: Panel
-        spec:
-          display:
-            name: KV cache hit (EPP predicted)
-            description: Share of prompt tokens the endpoint picker expected to be cached on the endpoint it chose. An estimate from its prefix index, not what the engines report.
-          plugin:
-            kind: StatChart
-            spec:
-              calculation: last-number
-              format:
-                unit: percent-decimal
-                decimalPlaces: 1
-          queries:
-          - kind: TimeSeriesQuery
-            spec:
-              plugin:
-                kind: PrometheusTimeSeriesQuery
-                spec:
-                  datasource: *id001
-                  query: sum(rate(llm_d_epp_prefix_predicted_cached_tokens_sum{cluster=~"$cluster_name"}[$__rate_interval])) / (sum(rate(llm_d_epp_prefix_prompt_tokens_sum{cluster=~"$cluster_name"}[$__rate_interval]))
-                    > 0)
       routedPerCandidate:
         kind: Panel
         spec:
@@ -255,7 +211,6 @@ spec:
               yAxis:
                 format:
                   unit: decimal
-                  decimalPlaces: 2
                 min: 0
               visual:
                 display: line
@@ -289,7 +244,6 @@ spec:
               yAxis:
                 format:
                   unit: decimal
-                  decimalPlaces: 2
                 min: 0
               visual:
                 display: line
@@ -323,7 +277,6 @@ spec:
               yAxis:
                 format:
                   unit: decimal
-                  decimalPlaces: 2
                 min: 0
               visual:
                 display: line
@@ -357,7 +310,6 @@ spec:
               yAxis:
                 format:
                   unit: decimal
-                  decimalPlaces: 2
                 min: 0
               visual:
                 display: line
@@ -424,7 +376,6 @@ spec:
               yAxis:
                 format:
                   unit: decimal
-                  decimalPlaces: 2
                 min: 0
               visual:
                 display: line
@@ -780,7 +731,6 @@ spec:
               yAxis:
                 format:
                   unit: decimal
-                  decimalPlaces: 2
                 min: 0
               visual:
                 display: line
@@ -813,7 +763,6 @@ spec:
               yAxis:
                 format:
                   unit: decimal
-                  decimalPlaces: 2
                 min: 0
               visual:
                 display: line
@@ -892,6 +841,50 @@ spec:
                   query: sum by (cluster, namespace) (rate({__name__=~"kserve_vllm:request_queue_time_seconds_sum|vllm:request_queue_time_seconds_sum",cluster=~"$cluster_name"}[$__rate_interval])) / (sum
                     by (cluster, namespace) (rate({__name__=~"kserve_vllm:request_queue_time_seconds_count|vllm:request_queue_time_seconds_count",cluster=~"$cluster_name"}[$__rate_interval])) > 0)
                   seriesNameFormat: '{{cluster}} {{namespace}}'
+      affinityKept:
+        kind: Panel
+        spec:
+          display:
+            name: Prompt affinity kept
+            description: Share of follow-up turns the gateway sent back to the site that already holds the conversation. Exploration and load overrides send a turn elsewhere on purpose; no match means the
+              index had forgotten it.
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format:
+                unit: percent-decimal
+                decimalPlaces: 1
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: sum(rate(grid_route_prefix_affinity_total{outcome="sticky",cluster=~"$cluster_name"}[$__rate_interval])) / (sum(rate(grid_route_prefix_affinity_total{outcome!="not_applicable",cluster=~"$cluster_name"}[$__rate_interval]))
+                    > 0)
+      pollsOk:
+        kind: Panel
+        spec:
+          display:
+            name: Peer poll success rate
+            description: Share of signal polls to peer sites that returned a reading. Below 100% a site is routed on its last good reading until it answers again.
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format:
+                unit: percent-decimal
+                decimalPlaces: 1
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: sum(rate(grid_signals_poll_total{result="ok",cluster=~"$cluster_name"}[$__rate_interval])) / (sum(rate(grid_signals_poll_total{cluster=~"$cluster_name"}[$__rate_interval])) > 0)
     layouts:
     - kind: Grid
       spec:
@@ -941,13 +934,13 @@ spec:
           width: 6
           height: 4
           content:
-            $ref: '#/spec/panels/kvCacheHit'
+            $ref: '#/spec/panels/affinityKept'
         - x: 18
           y: 4
           width: 6
           height: 4
           content:
-            $ref: '#/spec/panels/kvCacheHitPredicted'
+            $ref: '#/spec/panels/pollsOk'
     - kind: Grid
       spec:
         display:
