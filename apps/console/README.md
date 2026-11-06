@@ -100,6 +100,7 @@ cluster-admin rights.
 
 ## Keycloak restart behavior
 
-The default `apps/keycloak` profile imports its realms only when they do not
-exist. The backend's Keycloak user and organizations made in the console
-survive a Keycloak restart.
+`apps/keycloak` imports realm `saas` only when it does not exist. The
+backend's Keycloak user and organizations made in the console survive a
+Keycloak restart; Git edits to the realm file reach it through PostSync hooks
+([apps/keycloak/README.md](../keycloak/README.md#realm-imports-and-git-edits)).

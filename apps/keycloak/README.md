@@ -47,8 +47,10 @@ The direct installer creates namespace `maas-db` when it does not exist.
   and database without sharing credentials with the API database user.
 - Keycloak connects to `maas-db-rw` with TLS and verifies the server against
   the existing `maas-db-ca` Secret.
-- The default install imports the example realms and the core `saas` broker
-  realm when they do not exist. The `core` overlay excludes the examples.
+- The default install imports the core `saas` broker realm when it does not
+  exist, and rebuilds the example `grid-tenant-1-idp` and `grid-tenant-2-idp`
+  realms from Git on every start. The `core` overlay excludes the examples. See
+  [Realm Imports and Git Edits](#realm-imports-and-git-edits).
 - The upstream example `AITenant` resource is intentionally not applied by this
   app; the tenant-facing application should own its consumer configuration.
 
@@ -61,12 +63,15 @@ the CloudNativePG CRDs. Its retry policy refreshes and retries automatically.
 
 Git does not store Keycloak, client, broker, test-user, or database secret
 values. The app depends on the `external-secrets` Application and uses Password
-generators to create two Secrets in `maas-db`:
+generators to create these Secrets in `maas-db`:
 
 - `keycloak-db` holds the dedicated PostgreSQL role credentials consumed by
   CloudNativePG and Keycloak.
 - `keycloak-secrets` holds Keycloak bootstrap, client, broker, and test-user
   values.
+- `keycloak-redirect-uris-secret` and `keycloak-realm-sync-secret` hold the
+  client secrets of the `saas` realm's `keycloak-redirect-uris` and
+  `keycloak-realm-sync` service accounts.
 
 The `ExternalSecret` resources use `refreshPolicy: CreatedOnce` and
 `refreshInterval: 0s`, so each value is generated once and is not rotated by
@@ -103,8 +108,9 @@ which this app depends on for its database.
 
 Removing an explicit host from an existing Route can change the assigned public
 URL. Plan the corresponding Keycloak realm and client update before relying on
-the new issuer because Keycloak skips imports for realms that already exist in
-PostgreSQL.
+the new issuer: a restart rebuilds the example IdP realms, but the `saas`
+realm, which already exists in PostgreSQL, keeps its identity providers' URLs
+until `keycloak-saas-realm-sync` next runs, on the Application's next sync.
 
 ## Consumer Portal Redirects
 
@@ -119,9 +125,11 @@ redirect URIs to:
 - `http://localhost:8000/callback` for the browserless smoke test.
 
 The job replaces the complete redirect list, so removing a cluster's ingress or
-combined role removes its callback on the next run. A Keycloak restart does not
-re-import an existing realm, so the CronJob continues to maintain the live
-redirect list.
+combined role removes its callback on the next run. Nothing else changes these
+redirect URIs: a Keycloak restart doesn't re-import the existing `saas` realm,
+and `keycloak-saas-realm-sync` keeps the client's live redirect URIs. Only a
+new `saas` realm starts with the smoke-test redirect alone, until the first
+CronJob run.
 
 The updater authenticates with the realm-scoped `keycloak-redirect-uris`
 service account, whose generated client secret is stored in the dedicated
@@ -141,10 +149,114 @@ by the three realm-specific keystores.
 
 Realm imports replace `${KEYCLOAK_PUBLIC_URL}` with the value from the
 public-URL ConfigMap and the broker/client/test-user keys with values from the
-Keycloak Secret. Keycloak starts with `kc.sh import --override false`, so it
-skips a realm that already exists. Runtime changes in an existing realm survive
-a restart. Use a planned Keycloak export/import to apply later edits from Git
-to an existing realm.
+Keycloak Secrets (`base/manifests/scripts/render-realm.sh`). A placeholder a
+file holds needs its value; one it doesn't hold needs none.
+
+## Realm Imports and Git Edits
+
+The `render-realm-import` init container renders the realm files into two
+directories, and the Keycloak container imports each before `kc.sh start`:
+
+- `keycloak-realm-import` (base, and the examples component's `saas-realm.json`)
+  holds `saas`, which holds runtime data: the console backend's user
+  (`apps/console/create-secrets.sh`), the organizations the console creates
+  with their identity providers, and brokered users.
+  `kc.sh import --override false` creates it on the first start only; a
+  restart, node drain or eviction leaves it as it is. A realm added to this
+  ConfigMap is create-only too.
+- `keycloak-realm-overwrite` (examples component only) holds the
+  `grid-tenant-1-idp` and `grid-tenant-2-idp` example tenant IdPs, defined
+  wholly in Git. `kc.sh import --override true` deletes and rebuilds them on
+  every start, so an edit to their files takes effect on the next restart and
+  anything created in them at runtime is lost. Each of their users has a fixed
+  `id` in the file: it is the `sub` that `saas` links a brokered user to, so a
+  rebuild must not change it. The `core` overlay has none.
+
+The Deployment uses the `Recreate` strategy: the old pod stops before the new
+one imports, so no pod serves a realm while an overwrite import deletes and
+re-creates it in the shared database. A rollout has a few seconds without
+Keycloak.
+
+An edit to `saas-realm.json` reaches an existing realm through two Argo CD
+PostSync hooks, which run in sync-wave order after every sync of this
+Application (a change under `apps/keycloak`, or a self-heal), once the
+Keycloak Deployment is healthy:
+
+1. `keycloak-realm-sync-bootstrap` checks that the `keycloak-realm-sync`
+   client signs in and that its service account holds the roles the file gives
+   it. If so it exits without signing in as anyone else. If not (a realm
+   imported before the client was in the file, or a client secret generated
+   again), it signs in to `master` as the bootstrap admin and creates or
+   repairs that client and its roles, nothing else.
+2. `keycloak-saas-realm-sync` renders the file with the same script, signs in
+   as `keycloak-realm-sync`, and runs
+   `base/manifests/scripts/sync-saas-realm.py sync`, which deletes and
+   re-creates nothing:
+
+| In `saas-realm.json` | What the sync does |
+| --- | --- |
+| Realm settings: the top-level values that aren't lists or objects (`accessTokenLifespan`, `ssoSessionIdleTimeout`, `loginWithEmailAllowed`, `organizationsEnabled`, `enabled`) | Applies them with a realm update that carries no sub-resources. |
+| Clients, identity providers, identity provider mappers, users, groups and roles the realm lacks | Adds them with a partial import (`ifResourceExists: SKIP`). |
+| Clients the realm has | Updates each in place, on top of the live client: same id, so its sessions stay. Its protocol mappers become the file's, so a mapper removed from the file is deleted; client scopes the file lists are added. The `tenant-demo` client's redirect URIs stay as the CronJob set them. |
+| Identity providers and identity provider mappers the realm has | Updates each in place: same id, so organization links and brokered users' links stay. Config keys the file doesn't set stay. |
+| Identity provider mappers | Deletes the mappers of the file's identity providers that the file doesn't have. Identity providers the file doesn't have, such as the console's organizations', keep all of theirs. |
+| The example tenant IdP realms' users (examples component) | A brokered user whose `grid-tenant-*` link points at a user id the rebuilt realm no longer has is linked again to the file's fixed id, with the same username. The `saas` user keeps its id, organizations and sessions. This repairs the links of a realm whose tenant users predate the fixed ids, on the first sync after them. |
+| Service-account users | Grants the roles the file gives them. |
+
+A partial import with `ifResourceExists: OVERWRITE` isn't used: it deletes and
+re-creates each existing client and identity provider, which gives them new
+ids, ends the clients' sessions and drops the identity providers' organization
+links.
+
+These are not reconciled; plan them as a change of their own:
+
+- Removals, apart from client protocol mappers and the file's identity
+  providers' mappers. A client, identity provider, user, group, role, client
+  scope or role mapping removed from the file stays in the realm; delete it
+  through the admin console or API as well. The sync can't tell an identity
+  provider removed from the file from one the console created.
+- Organizations, including the `grid-tenant-1` and `grid-tenant-2` examples, and
+  their domains: they are created with the realm only.
+- Components: the realm's signing key provider and its user profile. A realm
+  created before the file had the `saas-signing` key provider keeps the keys
+  Keycloak generated for it.
+- Users, groups and roles that already exist, apart from the roles of service
+  accounts.
+- Realm settings that are lists or objects, such as `attributes`.
+
+### Credentials
+
+Each hook mounts no Kubernetes ServiceAccount token and gets its values as
+single Secret keys, never a whole Secret:
+
+- `keycloak-realm-sync-bootstrap` gets `KC_BOOTSTRAP_ADMIN_USERNAME` and
+  `KC_BOOTSTRAP_ADMIN_PASSWORD` from `keycloak-secrets`, and
+  `KEYCLOAK_REALM_SYNC_CLIENT_SECRET` to check the client. It reads only the
+  `keycloak-realm-sync` client and its service account from the unrendered
+  realm file.
+- `keycloak-saas-realm-sync` gets the values of the `saas` realm file's
+  placeholders (the `core` file's, plus the examples component's identity
+  provider URLs and broker secrets) and `KEYCLOAK_REALM_SYNC_CLIENT_SECRET`,
+  and no admin credential. It writes the rendered file to a memory-backed
+  volume.
+
+`keycloak-realm-sync`'s generated client secret is in the
+`keycloak-realm-sync-secret` Secret. Its service account has the `saas`
+realm's `manage-realm` (the realm update and the partial import),
+`manage-clients`, `manage-identity-providers` and `manage-users` (service
+accounts' role mappings) roles, and nothing outside `saas`. If a hook fails,
+the sync fails and the Application's retry policy runs it again; the failed Job
+stays for its logs until the next sync replaces it.
+
+`overlays/direct` (`install.sh`, without Argo CD) leaves both hooks out:
+`kubectl apply` would start them in no order and couldn't update them later.
+A direct install imports `saas` on the first start; apply later edits to it
+with a planned export/import or the admin API. It still rebuilds the example
+tenant IdP realms on every start. On a direct install whose tenant users
+predate their fixed ids, a brokered user's first sign-in after the update finds
+its link stale ("Account already exists"): delete that user's `grid-tenant-*`
+identity provider link in `saas` (Users, the user, Identity provider links) and
+add it again with the file's user id and username.
 
 ## Validation
 
@@ -155,7 +267,14 @@ kubectl get databaseroles,databases -n maas-db
 kubectl rollout status deployment/keycloak -n maas-db
 kubectl get route keycloak -n maas-db
 kubectl get configmap keycloak-public-url -n maas-db
+# The last sync, PostSync hooks included, and a hook's log while it runs or after it failed:
+kubectl get applications.argoproj.io keycloak -n openshift-gitops -o jsonpath='{.status.operationState.phase}{"\n"}'
+kubectl logs job/keycloak-realm-sync-bootstrap -n maas-db
+kubectl logs job/keycloak-saas-realm-sync -n maas-db
 ```
+
+Offline checks: `apps/keycloak/tests/realm-import-test.sh` and
+`apps/keycloak/tests/redirect-uris-test.sh`.
 
 The Keycloak database inherits the availability and storage characteristics of
 the existing `maas-db` CloudNativePG cluster. Database backups remain the

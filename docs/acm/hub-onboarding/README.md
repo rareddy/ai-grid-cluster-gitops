@@ -151,7 +151,7 @@ The console app installs the cloud provider's admin console on the hub, on both 
 
 Verify: the console pod is Ready (`oc -n ai-grid-provider-console get pods`), the Clusters page lists the ManagedClusters, and the Organizations page lists realm `saas`'s organizations.
 
-Keycloak rebuilds realm `saas` from its import file on every start (`--override true`), which deletes the backend's user and every organization made in the console. Rerunning create-secrets.sh after a Keycloak restart recreates the backend's user only; organizations made in the console have to be made again.
+Keycloak imports realm `saas` only when it doesn't exist, so a Keycloak restart keeps the backend's user and the organizations made in the console ([apps/keycloak/README.md](../../../apps/keycloak/README.md#realm-imports-and-git-edits)). Earlier versions rebuilt the realm on every start: on a hub where that already deleted them, rerun create-secrets.sh once to recreate the backend's user; organizations made in the console have to be made again.
 
 ## Grid ID
 

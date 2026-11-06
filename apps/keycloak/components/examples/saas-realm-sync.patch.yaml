@@ -1,0 +1,38 @@
+# The placeholders this component's saas-realm.json adds: the example identity
+# providers' URLs and broker client secrets. And the example tenant realms as
+# they are in Git, unrendered: the sync reads only their users' fixed ids, to
+# link brokered users again to a rebuilt realm's users.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: keycloak-saas-realm-sync
+  namespace: maas-db
+spec:
+  template:
+    spec:
+      containers:
+        - name: sync
+          env:
+            - name: KEYCLOAK_PUBLIC_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: keycloak-public-url
+                  key: KEYCLOAK_PUBLIC_URL
+            - name: GRID_TENANT_1_BROKER_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-secrets
+                  key: GRID_TENANT_1_BROKER_CLIENT_SECRET
+            - name: GRID_TENANT_2_BROKER_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-secrets
+                  key: GRID_TENANT_2_BROKER_CLIENT_SECRET
+          volumeMounts:
+            - name: realm-overwrite-source
+              mountPath: /opt/keycloak/realm-overwrite-source
+              readOnly: true
+      volumes:
+        - name: realm-overwrite-source
+          configMap:
+            name: keycloak-realm-overwrite

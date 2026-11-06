@@ -5,11 +5,23 @@ kind: Component
 resources:
   - signing-keys-grid.yaml
 configMapGenerator:
+  # The saas realm with the example identity providers and organizations:
+  # imported only when it doesn't exist, like the base realm it replaces.
   - name: keycloak-realm-import
     behavior: merge
     files:
       - saas-realm.json
+  # The example tenant IdP realms hold no runtime data: they are rebuilt from
+  # Git on every start (kc.sh import --override true).
+  - name: keycloak-realm-overwrite
+    namespace: maas-db
+    options:
+      annotations:
+        argocd.argoproj.io/sync-wave: "2"
+    files:
       - grid-tenant-1-idp-realm.json
       - grid-tenant-2-idp-realm.json
 patches:
   - path: keycloak-grid-keystores.patch.yaml
+  - path: keycloak-realm-overwrite.patch.yaml
+  - path: saas-realm-sync.patch.yaml

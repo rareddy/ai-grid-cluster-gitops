@@ -99,6 +99,7 @@
   ],
   "users": [
     {
+      "id": "e58c353f-daf3-5cec-bb71-7163c2deb1b1",
       "username": "alice",
       "email": "alice@grid-tenant-1.test",
       "emailVerified": true,

@@ -4,3 +4,4 @@ resources:
   - ../default
 patches:
   - path: remove-public-url-policy.yaml
+  - path: remove-realm-sync-hooks.yaml

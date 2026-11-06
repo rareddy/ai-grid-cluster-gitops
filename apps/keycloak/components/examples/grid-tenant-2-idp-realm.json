@@ -91,6 +91,7 @@
   ],
   "users": [
     {
+      "id": "13b11fd1-d8ef-53d3-8070-b759a0f4cf0f",
       "username": "bob",
       "email": "bob@grid-tenant-2.test",
       "emailVerified": true,
@@ -112,6 +113,7 @@
       ]
     },
     {
+      "id": "0aad9c9d-8d04-507f-85b0-e4ea4f94c063",
       "username": "carol",
       "email": "carol@grid-tenant-2.test",
       "emailVerified": true,

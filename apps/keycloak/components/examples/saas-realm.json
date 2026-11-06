@@ -127,6 +127,22 @@
       "defaultClientScopes": [
         "basic"
       ]
+    },
+    {
+      "clientId": "keycloak-realm-sync",
+      "name": "saas realm sync from Git",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${KEYCLOAK_REALM_SYNC_CLIENT_SECRET}",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "redirectUris": [],
+      "defaultClientScopes": [
+        "basic"
+      ]
     }
   ],
   "users": [
@@ -138,6 +154,19 @@
         "realm-management": [
           "view-clients",
           "manage-clients"
+        ]
+      }
+    },
+    {
+      "username": "service-account-keycloak-realm-sync",
+      "enabled": true,
+      "serviceAccountClientId": "keycloak-realm-sync",
+      "clientRoles": {
+        "realm-management": [
+          "manage-realm",
+          "manage-clients",
+          "manage-identity-providers",
+          "manage-users"
         ]
       }
     }
