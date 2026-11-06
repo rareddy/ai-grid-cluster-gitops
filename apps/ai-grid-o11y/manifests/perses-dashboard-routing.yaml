@@ -114,7 +114,7 @@ spec:
         spec:
           display:
             name: Fallback rate
-            description: Share of requests routed to a site the gateway had marked unhealthy, because no healthy site served the model.
+            description: Share of requests served by a site the gateway had marked unhealthy, because no healthy site was left for that model.
           plugin:
             kind: StatChart
             spec:
@@ -299,7 +299,7 @@ spec:
           display:
             name: Prompt affinity (requests/sec)
             description: 'sticky: kept to the sites holding the prompt. load_override: their queue outweighed the match. exploration: sent elsewhere to learn. no_match: no site held the prompt. not_applicable:
-              fewer than two sites with room.'
+              fewer than two sites with room. Requests with no conversation are left out.'
           plugin:
             kind: TimeSeriesChart
             spec:
@@ -324,7 +324,7 @@ spec:
                 kind: PrometheusTimeSeriesQuery
                 spec:
                   datasource: *id001
-                  query: sum by (outcome) (rate(grid_route_prefix_affinity_total{cluster=~"$cluster_name"}[$__rate_interval]))
+                  query: sum by (outcome) (rate(grid_route_prefix_affinity_total{outcome!="not_applicable",cluster=~"$cluster_name"}[$__rate_interval]))
                   seriesNameFormat: '{{outcome}}'
       prefixIndexFill:
         kind: Panel
@@ -396,7 +396,7 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Load used to choose
+            name: Load per candidate
             description: 'Saturation the draw weighs each candidate by: the nearer of its counted and reported load, smoothed. 1 means no room. A gap means unmeasured.'
           plugin:
             kind: TimeSeriesChart
@@ -553,7 +553,7 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Queue score
+            name: Score per candidate
             description: Score each candidate ranks by in the current snapshot. A gap means excluded or demoted. A 1 on the unavailable line means the selector had no score for that candidate and could
               only fall back.
           plugin:
@@ -593,7 +593,7 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Full
+            name: Full candidates
             description: 1 while a candidate has had a backlog at its ceiling long enough to shed.
           plugin:
             kind: TimeSeriesChart
@@ -625,7 +625,7 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Silent
+            name: Silent candidates
             description: 1 while a site that has published sent nothing within the freshness window. A silent site takes no request while a live one can.
           plugin:
             kind: TimeSeriesChart
@@ -846,8 +846,8 @@ spec:
         spec:
           display:
             name: Prompt affinity kept
-            description: Share of follow-up turns the gateway sent back to the site that already holds the conversation. Exploration and load overrides send a turn elsewhere on purpose; no match means the
-              index had forgotten it.
+            description: 'Share of follow-up turns the gateway sent back to the site that already holds the conversation. Exploration and load overrides send a turn elsewhere on purpose; no match means
+              the index had forgotten it. Needs chat traffic: text completions carry no conversation and count as not applicable.'
           plugin:
             kind: StatChart
             spec:
@@ -885,6 +885,41 @@ spec:
                 spec:
                   datasource: *id001
                   query: sum(rate(grid_signals_poll_total{result="ok",cluster=~"$cluster_name"}[$__rate_interval])) / (sum(rate(grid_signals_poll_total{cluster=~"$cluster_name"}[$__rate_interval])) > 0)
+      sharePerCandidate:
+        kind: Panel
+        spec:
+          display:
+            name: Share of requests per candidate
+            description: Each candidate's share of the requests this gateway sent anywhere, routed or fallback.
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              yAxis:
+                format:
+                  unit: percent-decimal
+                  decimalPlaces: 0
+                max: 1
+                min: 0
+              visual:
+                stack: all
+                areaOpacity: 1
+                lineWidth: 0.25
+                connectNulls: false
+                display: line
+              legend:
+                position: bottom
+                mode: list
+                values: []
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  seriesNameFormat: '{{site}} {{backend}}'
+                  query: sum by (site, backend) (rate(grid_route_decisions_total{site=~"$site",backend=~"$backend",reason=~"routed|fallback",cluster=~"$cluster_name"}[$__rate_interval])) / ignoring(site,
+                    backend) group_left sum(rate(grid_route_decisions_total{reason=~"routed|fallback",cluster=~"$cluster_name"}[$__rate_interval]))
     layouts:
     - kind: Grid
       spec:
@@ -965,112 +1000,38 @@ spec:
           width: 12
           height: 8
           content:
-            $ref: '#/spec/panels/selectionPath'
-        - x: 12
-          y: 12
-          width: 12
-          height: 8
-          content:
-            $ref: '#/spec/panels/prefixAffinity'
+            $ref: '#/spec/panels/sharePerCandidate'
     - kind: Grid
       spec:
         display:
-          title: Prompt index
+          title: Why this site
           collapse:
             open: true
         items:
         - x: 0
           y: 20
-          width: 12
-          height: 8
-          content:
-            $ref: '#/spec/panels/prefixIndexFill'
-        - x: 12
-          y: 20
-          width: 12
-          height: 8
-          content:
-            $ref: '#/spec/panels/prefixIndexEvictions'
-    - kind: Grid
-      spec:
-        display:
-          title: Site selection signals
-          collapse:
-            open: true
-        items:
-        - x: 0
-          y: 20
-          width: 12
-          height: 8
-          content:
-            $ref: '#/spec/panels/rho'
-        - x: 12
-          y: 20
-          width: 12
-          height: 8
-          content:
-            $ref: '#/spec/panels/rhoSources'
-        - x: 0
-          y: 28
-          width: 12
-          height: 8
-          content:
-            $ref: '#/spec/panels/weight'
-        - x: 12
-          y: 28
-          width: 12
-          height: 8
-          content:
-            $ref: '#/spec/panels/inFlight'
-        - x: 0
-          y: 36
           width: 12
           height: 8
           content:
             $ref: '#/spec/panels/score'
         - x: 12
-          y: 36
+          y: 20
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/rho'
+        - x: 0
+          y: 28
           width: 12
           height: 8
           content:
             $ref: '#/spec/panels/full'
-        - x: 0
-          y: 44
+        - x: 12
+          y: 28
           width: 12
           height: 8
           content:
             $ref: '#/spec/panels/silent'
-    - kind: Grid
-      spec:
-        display:
-          title: Signal freshness
-          collapse:
-            open: true
-        items:
-        - x: 0
-          y: 52
-          width: 12
-          height: 8
-          content:
-            $ref: '#/spec/panels/readingAge'
-        - x: 12
-          y: 52
-          width: 12
-          height: 8
-          content:
-            $ref: '#/spec/panels/roundAge'
-        - x: 0
-          y: 60
-          width: 12
-          height: 8
-          content:
-            $ref: '#/spec/panels/signalsPoll'
-        - x: 12
-          y: 60
-          width: 12
-          height: 8
-          content:
-            $ref: '#/spec/panels/ingestDropped'
     - kind: Grid
       spec:
         display:
@@ -1079,14 +1040,101 @@ spec:
             open: true
         items:
         - x: 0
-          y: 68
+          y: 36
           width: 12
           height: 8
           content:
             $ref: '#/spec/panels/ttft'
         - x: 12
-          y: 68
+          y: 36
           width: 12
           height: 8
           content:
             $ref: '#/spec/panels/queueTime'
+    - kind: Grid
+      spec:
+        display:
+          title: Routing internals
+          collapse:
+            open: false
+        items:
+        - x: 0
+          y: 44
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/selectionPath'
+        - x: 12
+          y: 44
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/prefixAffinity'
+        - x: 0
+          y: 52
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/prefixIndexFill'
+        - x: 12
+          y: 52
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/prefixIndexEvictions'
+    - kind: Grid
+      spec:
+        display:
+          title: Capacity detail
+          collapse:
+            open: false
+        items:
+        - x: 0
+          y: 60
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/rhoSources'
+        - x: 12
+          y: 60
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/weight'
+        - x: 0
+          y: 68
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/inFlight'
+    - kind: Grid
+      spec:
+        display:
+          title: Signal freshness
+          collapse:
+            open: false
+        items:
+        - x: 0
+          y: 76
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/readingAge'
+        - x: 12
+          y: 76
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/roundAge'
+        - x: 0
+          y: 84
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/signalsPoll'
+        - x: 12
+          y: 84
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/ingestDropped'
