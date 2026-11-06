@@ -93,7 +93,8 @@ spokePolicy:
   readCredential:
     enabled: true
 
-    # Minted into this hub Secret by create-reader-token.sh, for the reader
+    # Minted into this hub Secret by the reader-token provisioning Job
+    # (manifests/32-job-provision-usage-logs-reader-token.yaml), for the reader
     # identity apps/ai-grid-o11y owns. The templating ServiceAccount reads it
     # through the pinned resourceNames in manifests/20-hub-template-rbac.yaml.
     credentialSecretName: usage-logs-hub-read-credential

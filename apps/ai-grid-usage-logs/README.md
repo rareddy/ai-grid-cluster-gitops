@@ -30,46 +30,40 @@ What this app adds is what that one lacks:
 | `manifests/00-loki-operator.yaml` | The Loki operator. `apps/ai-grid-o11y` renders a LokiStack but ships no Subscription, and on a dedicated hub nothing else installs one — it otherwise arrives with the RHOAI chart's `dependencies.loki`, which a hub running no RHOAI never pulls in. |
 | the chart's spoke Policy | Ships the writer token, patches each site's `DSCInitialization` with the exporter configuration, and delivers the read credential — query endpoint plus read-only token — to `redhat-ai-gateway-infra` on every selected site. |
 | `manifests/20-hub-template-rbac.yaml` | Lets ACM resolve the Policy's hub templates: the ingest Route in `redhat-ods-monitoring`, and both credentials in `ai-grid-policies`. |
+| `manifests/30-rbac-provision-usage-logs-tokens.yaml` | The identity both token-provisioning Jobs run as: minting tokens for the two `apps/ai-grid-o11y` ServiceAccounts, reading the store Route, and writing the credentials in `ai-grid-policies`. |
+| `manifests/31-job-provision-usage-logs-writer-token.yaml` | Mints the writer token. |
+| `manifests/32-job-provision-usage-logs-reader-token.yaml` | Mints the reader token and records the query endpoint. |
 
 The ingest endpoint is an ACM hub template rather than a literal, because it is
 the hub's own Route host and differs per fleet. `helm lookup` cannot supply it:
 the Argo CD repo-server renders without cluster access.
 
-## Mint the writer token
+## Token minting
 
-The chart does not create it, because a ServiceAccount token is not a
+The chart does not create the tokens, because a ServiceAccount token is not a
+declarative object. Two PostSync Jobs mint them instead —
+`manifests/31-job-provision-usage-logs-writer-token.yaml` and
+`manifests/32-job-provision-usage-logs-reader-token.yaml` — running as the
+ServiceAccount from `manifests/30-rbac-provision-usage-logs-tokens.yaml`.
+ACM reads the Secrets with `fromSecret` and ships `$ocm_encrypted` ciphertext,
+so the tokens never appear in a managed cluster's manifest.
 
-declarative object. ACM reads the Secret with `fromSecret` and ships
-`$ocm_encrypted` ciphertext, so the token never appears in a managed cluster's
-manifest.
+Both Jobs are idempotent: they decode the stored token's JWT expiry and do
+nothing while more than a week remains and (for the reader) the recorded
+endpoint still matches the store Route. PostSync hooks run on every sync, so
+repeated syncs do not rotate a healthy credential — while expiry, deletion of
+the Secret, or a Route host change triggers a re-mint on the next sync. The
+Policy re-resolves the Secret and each site picks up the new values, so
+rotation is the same operation as creation. The lifetime is one year; the
+cluster's `--service-account-max-token-expiration` may cap what is actually
+issued.
 
-Run this after the Application has synced, so the ServiceAccount exists:
-
-```sh
-export HUB_CONTEXT=<hub context>
-
-apps/ai-grid-usage-logs/create-writer-token.sh
-```
-
-Re-running rotates the token. The Policy re-resolves the Secret and each site
-picks up the new value, so rotation is the same operation as creation. The
-default lifetime is one year; `TOKEN_DURATION` overrides it, and the cluster's
-`--service-account-max-token-expiration` may cap what is actually issued.
-
-## Mint the reader token
-
-Same story, read-only identity. The Policy ships the query endpoint and this
-token to `redhat-ai-gateway-infra` on each selected site, as `usage-logs-loki`:
-
-```sh
-export HUB_CONTEXT=<hub context>
-
-apps/ai-grid-usage-logs/create-reader-token.sh
-```
-
-Rotation works the same way. The grant is `get` on the infrastructure tenant
-only — no `create` — so a leaked reader token exposes usage records but cannot
-corrupt them.
+The reader Job also records the query endpoint, derived from the store Route's
+host because it differs per fleet and the Argo CD repo-server renders without
+cluster access. It waits up to ten minutes for the Loki operator to publish
+the Route's host rather than failing. The grant is `get` on the infrastructure
+tenant only — no `create` — so a leaked reader token exposes usage records but
+cannot corrupt them.
 
 ## Verify
 
