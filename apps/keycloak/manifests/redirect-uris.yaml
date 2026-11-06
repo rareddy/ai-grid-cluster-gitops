@@ -128,7 +128,7 @@ spec:
 
                   client_uuid="$(/opt/keycloak/bin/kcadm.sh get clients \
                     --config "$kcadm_config" \
-                    --target-realm saas \
+                    --realm saas \
                     --query "clientId=$KEYCLOAK_CLIENT_ID" \
                     --fields id | sed -n 's/.*"id" *: *"\([^"]*\)".*/\1/p' | head -1)"
                   [[ -n "$client_uuid" ]] || {
@@ -138,7 +138,7 @@ spec:
 
                   /opt/keycloak/bin/kcadm.sh update "clients/$client_uuid" \
                     --config "$kcadm_config" \
-                    --target-realm saas \
+                    --realm saas \
                     --set "redirectUris=$redirect_uris"
               envFrom:
                 - secretRef:

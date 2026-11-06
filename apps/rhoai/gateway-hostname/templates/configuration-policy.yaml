@@ -26,14 +26,4 @@ spec:
               hostname: '{{ $hostnamePrefix }}.{{ "{{" }} (lookup "config.openshift.io/v1" "Ingress" "" "cluster").spec.domain {{ "}}" }}'
             - name: https
               hostname: '{{ $hostnamePrefix }}.{{ "{{" }} (lookup "config.openshift.io/v1" "Ingress" "" "cluster").spec.domain {{ "}}" }}'
-              # The Service's serving certificate covers internal .svc names,
-              # not this public hostname. Add the default ingress wildcard
-              # certificate from the same namespace; the gateway selects it by
-              # SNI. musthave preserves the existing internal certificate.
-              tls:
-                mode: Terminate
-                certificateRefs:
-                  - group: ""
-                    kind: Secret
-                    name: '{{ "{{" }} get (get (lookup "operator.openshift.io/v1" "IngressController" "openshift-ingress-operator" "default").spec "defaultCertificate" | default dict) "name" | default "router-certs-default" {{ "}}" }}'
 {{- end }}

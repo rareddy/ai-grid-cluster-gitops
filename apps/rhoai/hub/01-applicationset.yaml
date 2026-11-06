@@ -150,9 +150,6 @@ spec:
           jqPathExpressions:
             - '.spec.listeners[] | select(.name == "http") | .hostname'
             - '.spec.listeners[] | select(.name == "https") | .hostname'
-            # The ACM hostname policy discovers the cluster's public ingress
-            # certificate; keep selfHeal from removing that added reference.
-            - '.spec.listeners[] | select(.name == "https") | .tls.certificateRefs'
         # OpenShift injects a generated dockercfg pull secret into this
         # OLM-owned ServiceAccount. Ignore only that controller-generated entry
         # so Argo still owns the explicit catalog pull secret.
