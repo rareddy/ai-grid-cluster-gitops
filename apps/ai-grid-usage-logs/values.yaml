@@ -118,7 +118,7 @@ spokePolicy:
     # ai-grid/role. Overriding matchLabels here would ADD to the default rather
     # than replace it, and the Placement would then match nothing.
     excludeLocalCluster: true
-    labels:
+    matchLabels:
       ai-grid/role: combined
 
   spoke:
