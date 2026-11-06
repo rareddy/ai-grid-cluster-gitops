@@ -53,10 +53,9 @@ assert "consoleurl.cluster.open-cluster-management.io" in init_script
 assert "https://maas.apps.%s/oauth2/callback" in init_script
 assert "http://localhost:8000/callback" in init_script
 assert "kcadm.sh update" in update_script
-# --realm changes the credential realm and would reauthenticate master admin
-# against saas; --target-realm selects resources while retaining master auth.
-assert "--realm master" in update_script
-assert "--realm saas" not in update_script
+# Authentication uses the realm-scoped service account. Resource operations
+# retain that credential context and explicitly select the saas target realm.
+assert "--realm master" not in update_script
 assert update_script.count("--target-realm saas") == 2
 assert '--config "$kcadm_config"' in update_script
 assert '--realm saas' in update_script

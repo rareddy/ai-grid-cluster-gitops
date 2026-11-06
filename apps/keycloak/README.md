@@ -85,9 +85,9 @@ redirect URIs to:
 - `http://localhost:8000/callback` for the browserless smoke test.
 
 The job replaces the complete redirect list, so removing a cluster's ingress or
-combined role removes its callback on the next run. A Keycloak restart imports
-the realm from Git and resets the client to the smoke-test redirect; the next
-CronJob run restores the cluster callbacks.
+combined role removes its callback on the next run. Startup imports only missing
+realms (`--override false`), preserving existing clients, users and organizations.
+Changes to the realm JSON do not migrate realms already stored in the database.
 
 The updater authenticates with the realm-scoped `keycloak-redirect-uris`
 service account, whose generated client secret is stored in the dedicated
@@ -135,4 +135,6 @@ installation.
 
 ## Tenant portal callback registration
 
-The redirect-URI CronJob discovers enabled ingress/combined sites and registers their native MaaS portal OAuth callbacks on the tenant client. Its CLI authenticates in `master`, then uses `--target-realm saas` for client queries and updates. `--realm saas` changes the authentication realm and makes these operations fail with HTTP 401 even when the administrator password is correct. Check Job completion separately from Argo Application health.
+The redirect-URI CronJob discovers enabled ingress/combined sites and registers their native MaaS portal OAuth callbacks on the tenant client. Its CLI authenticates in `saas` using the realm-scoped `keycloak-redirect-uris` service account, then uses `--target-realm saas` for client queries and updates. Check Job completion separately from Argo Application health.
+
+When upgrading an existing installation, provision the new `keycloak-redirect-uris` client and its service-account role mappings in the existing `saas` realm using the definition in `manifests/realms/saas-realm.json`. Its secret must match `maas-db/keycloak-redirect-uris-secret`; handle it locally without printing or committing it. Startup import skips existing realms, so deploying the new JSON alone does not create this client. Preserve existing realm data; do not force a replacement import to perform this migration.
