@@ -69,8 +69,8 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Decision rate (requests/sec)
-            description: Requests this gateway decided per second, routed or refused.
+            name: Requests decided (requests/sec)
+            description: Requests per second this gateway made a routing decision for, whether it sent them to a site or refused them.
           plugin:
             kind: StatChart
             spec:
@@ -90,9 +90,9 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Refusal rate
-            description: 'Share of decisions answered without routing: no ready site, no route, a bad request, or shed. A request that names no model, such as GET /v1/models from a client health check,
-              counts as a bad request.'
+            name: Requests refused
+            description: 'Share of requests this gateway answered with an error instead of sending to a site. The reasons: no site was ready for the model (503), the chosen site had no route from this gateway
+              (503), the request named no model or one nobody serves (400 or 404), or the model was shed because every site serving it was full.'
           plugin:
             kind: StatChart
             spec:
@@ -113,8 +113,9 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Fallback rate
-            description: Share of requests served by a site the gateway had marked unhealthy, because no healthy site was left for that model.
+            name: Requests sent to unhealthy sites
+            description: Share of requests this gateway sent to a site it had marked unhealthy, because no healthy site was left for that model. The request still gets served. Above zero means the grid
+              is running a model on sites it would normally avoid.
           plugin:
             kind: StatChart
             spec:
@@ -156,7 +157,7 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Sites full
+            name: Site capacity full
             description: Candidates at their ceiling with work waiting for 5 s. This reading has no hold and flips near the ceiling. A model sheds only when every site stays full, so read Shedding for the
               decision.
           plugin:
@@ -178,8 +179,9 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Oldest reading
-            description: Age of the oldest load reading any decision used. A large value means a site is routed on stale data.
+            name: Oldest site load reading in use
+            description: Age of the stalest load reading any routing decision used, across every site this gateway routes to. The gateway refreshes readings every few seconds, so a value in the tens of
+              seconds means a site has stopped answering and is routed on old data.
           plugin:
             kind: StatChart
             spec:
@@ -199,7 +201,7 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Routed per candidate (requests/sec)
+            name: Routed per model and site (requests/sec)
             description: Requests sent to each site and cluster.
           plugin:
             kind: TimeSeriesChart
@@ -396,7 +398,7 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Load per candidate
+            name: Load per model and site
             description: 'Saturation the draw weighs each candidate by: the nearer of its counted and reported load, smoothed. 1 means no room. A gap means unmeasured.'
           plugin:
             kind: TimeSeriesChart
@@ -427,8 +429,9 @@ spec:
         kind: Panel
         spec:
           display:
-            name: 'Load: reported against counted'
-            description: 'Reported: the site''s own KV cache use plus its spread. Counted: requests in flight over the ceiling. The nearer one sets the load used to choose.'
+            name: 'Load: site report vs this gateway''s in-flight requests'
+            description: Two readings of the same load per model and site. The site report is the KV cache use the site publishes about itself, plus its spread, polled a few seconds ago and complete. The
+              in-flight count is what this gateway has sent to that candidate and is still waiting on, over its ceiling, current but only its own traffic.
           plugin:
             kind: TimeSeriesChart
             spec:
@@ -453,7 +456,7 @@ spec:
                 spec:
                   datasource: *id001
                   query: max by (site, backend) (grid_route_site_rho_reported{site=~"$site",backend=~"$backend",cluster=~"$cluster_name"})
-                  seriesNameFormat: reported {{site}} {{backend}}
+                  seriesNameFormat: site report {{site}} {{backend}}
           - kind: TimeSeriesQuery
             spec:
               plugin:
@@ -461,13 +464,14 @@ spec:
                 spec:
                   datasource: *id001
                   query: max by (site, backend) (grid_route_site_rho_counted{site=~"$site",backend=~"$backend",cluster=~"$cluster_name"})
-                  seriesNameFormat: counted {{site}} {{backend}}
+                  seriesNameFormat: this gateway in flight {{site}} {{backend}}
       weight:
         kind: Panel
         spec:
           display:
-            name: Capacity weight
-            description: Capacity the draw weights each candidate by. A gap means unmeasured; the draw then uses the mean of the known weights.
+            name: Capacity per model and site
+            description: How many requests the gateway believes each candidate can carry at once, measured from how it has been serving. A bigger capacity gets a bigger share of the traffic. A gap means
+              not yet measured, and the gateway then assumes the average of the others.
           plugin:
             kind: TimeSeriesChart
             spec:
@@ -497,9 +501,9 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Capacity the selector believed
-            description: Requests in flight at each candidate against the ceiling the selector used, with the soft bound it learned from congestion and the hard bound the site declared. In flight near the
-              ceiling with the soft bound below the hard one means the selector capped the site below what it declared.
+            name: In flight vs ceiling per model and site
+            description: Requests this gateway has running at each candidate against the ceiling it used. The soft bound is what it learned from congestion and the hard bound is what the site declared.
+              In flight near the ceiling with the soft bound under the hard one means the gateway capped the site below what it declared.
           plugin:
             kind: TimeSeriesChart
             spec:
@@ -553,7 +557,7 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Score per candidate
+            name: Score per model and site
             description: Score each candidate ranks by in the current snapshot. A gap means excluded or demoted. A 1 on the unavailable line means the selector had no score for that candidate and could
               only fall back.
           plugin:
@@ -593,7 +597,7 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Full candidates
+            name: Full per model and site
             description: 1 while a candidate has had a backlog at its ceiling long enough to shed.
           plugin:
             kind: TimeSeriesChart
@@ -625,7 +629,7 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Silent candidates
+            name: Silent per model and site
             description: 1 while a site that has published sent nothing within the freshness window. A silent site takes no request while a live one can.
           plugin:
             kind: TimeSeriesChart
@@ -657,8 +661,8 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Age of the reading each decision used
-            description: A line that only climbs is a frozen reading, not a steady one.
+            name: Age of the load reading used per model and site
+            description: How old the peer's load reading was when each decision used it. A line that only climbs is a frozen reading, not a steady one.
           plugin:
             kind: TimeSeriesChart
             spec:
@@ -688,8 +692,8 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Since the last poll of each peer
-            description: Seconds since this site's operator last polled each peer. Empty for this site.
+            name: Seconds since each site last reported its load
+            description: Seconds since this gateway last fetched a load reading from each peer site. Empty for its own site.
           plugin:
             kind: TimeSeriesChart
             spec:
@@ -719,8 +723,8 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Gateway polls of its operator (requests/sec)
-            description: The gateway reads every site's load from its own operator. Anything but success leaves readings to age.
+            name: Load reading fetches per second
+            description: How often this gateway fetches load readings from each peer site, by result. Anything but ok leaves that site's reading to age.
           plugin:
             kind: TimeSeriesChart
             spec:
@@ -751,8 +755,8 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Readings refused (requests/sec)
-            description: Rows the gateway dropped instead of routing on them, by reason.
+            name: Load readings rejected per second
+            description: Load readings the gateway threw away instead of routing on them, by reason.
           plugin:
             kind: TimeSeriesChart
             spec:
@@ -868,8 +872,8 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Peer poll success rate
-            description: Share of signal polls to peer sites that returned a reading. Below 100% a site is routed on its last good reading until it answers again.
+            name: Load reading fetch success rate
+            description: Share of this gateway's fetches of peer sites' load readings that succeeded. Below 100% a site is routed on its last good reading until it answers again.
           plugin:
             kind: StatChart
             spec:
@@ -889,7 +893,7 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Share of requests per candidate
+            name: Share of requests per model and site
             description: Each candidate's share of the requests this gateway sent anywhere, routed or fallback.
           plugin:
             kind: TimeSeriesChart
@@ -1004,7 +1008,7 @@ spec:
     - kind: Grid
       spec:
         display:
-          title: Why this site
+          title: Load and availability per model and site
           collapse:
             open: true
         items:
@@ -1110,7 +1114,7 @@ spec:
     - kind: Grid
       spec:
         display:
-          title: Signal freshness
+          title: Freshness of site load readings
           collapse:
             open: false
         items:
