@@ -44,14 +44,42 @@
           }
         },
         {
-          "name": "MaaS organizations",
+          "name": "MaaS org id",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usermodel-attribute-mapper",
           "config": {
-            "user.attribute": "maas_orgs_json",
-            "claim.name": "https://redhat\\.com/maas/orgs",
-            "jsonType.label": "JSON",
+            "user.attribute": "maas_org_id",
+            "claim.name": "org_id",
+            "jsonType.label": "String",
             "multivalued": "false",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "MaaS org name",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "maas_org_name",
+            "claim.name": "org_name",
+            "jsonType.label": "String",
+            "multivalued": "false",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "MaaS roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "maas_roles",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
             "id.token.claim": "true",
             "userinfo.token.claim": "true",
             "access.token.claim": "true"
@@ -172,12 +200,32 @@
       }
     },
     {
-      "name": "Grid Tenant 1 organizations transport",
+      "name": "Grid Tenant 1 org id",
+      "identityProviderAlias": "grid-tenant-1",
+      "identityProviderMapper": "hardcoded-attribute-idp-mapper",
+      "config": {
+        "attribute": "maas_org_id",
+        "attribute.value": "42c3e46f-2477-44d7-a85b-d3b43f6b31fa",
+        "syncMode": "FORCE"
+      }
+    },
+    {
+      "name": "Grid Tenant 1 org name",
+      "identityProviderAlias": "grid-tenant-1",
+      "identityProviderMapper": "hardcoded-attribute-idp-mapper",
+      "config": {
+        "attribute": "maas_org_name",
+        "attribute.value": "Grid Tenant 1",
+        "syncMode": "FORCE"
+      }
+    },
+    {
+      "name": "Grid Tenant 1 roles transport",
       "identityProviderAlias": "grid-tenant-1",
       "identityProviderMapper": "oidc-user-attribute-idp-mapper",
       "config": {
-        "claim": "https://redhat\\.com/maas/orgs",
-        "user.attribute": "maas_orgs_json",
+        "claim": "roles",
+        "user.attribute": "maas_roles",
         "syncMode": "FORCE"
       }
     },
@@ -192,12 +240,32 @@
       }
     },
     {
-      "name": "Grid Tenant 2 organizations transport",
+      "name": "Grid Tenant 2 org id",
+      "identityProviderAlias": "grid-tenant-2",
+      "identityProviderMapper": "hardcoded-attribute-idp-mapper",
+      "config": {
+        "attribute": "maas_org_id",
+        "attribute.value": "53d4f57e-3588-55e8-b96c-4ec54a7c42fa",
+        "syncMode": "FORCE"
+      }
+    },
+    {
+      "name": "Grid Tenant 2 org name",
+      "identityProviderAlias": "grid-tenant-2",
+      "identityProviderMapper": "hardcoded-attribute-idp-mapper",
+      "config": {
+        "attribute": "maas_org_name",
+        "attribute.value": "Grid Tenant 2",
+        "syncMode": "FORCE"
+      }
+    },
+    {
+      "name": "Grid Tenant 2 roles transport",
       "identityProviderAlias": "grid-tenant-2",
       "identityProviderMapper": "oidc-user-attribute-idp-mapper",
       "config": {
-        "claim": "https://redhat\\.com/maas/orgs",
-        "user.attribute": "maas_orgs_json",
+        "claim": "roles",
+        "user.attribute": "maas_roles",
         "syncMode": "FORCE"
       }
     }
@@ -238,6 +306,7 @@
   },
   "organizations": [
     {
+      "id": "42c3e46f-2477-44d7-a85b-d3b43f6b31fa",
       "name": "Grid Tenant 1",
       "alias": "grid-tenant-1",
       "enabled": true,
@@ -262,6 +331,7 @@
       ]
     },
     {
+      "id": "53d4f57e-3588-55e8-b96c-4ec54a7c42fa",
       "name": "Grid Tenant 2",
       "alias": "grid-tenant-2",
       "enabled": true,

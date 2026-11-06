@@ -7,9 +7,12 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-kubectl kustomize "$HERE/.." > "$TMP_DIR/rendered.yaml"
+kubectl kustomize "$HERE/../base" > "$TMP_DIR/rendered.yaml"
 
-python3 - "$TMP_DIR/rendered.yaml" "$TMP_DIR" <<'PY'
+python3 - "$TMP_DIR/rendered.yaml" "$TMP_DIR" \
+  "$HERE/../base/manifests/realms/saas-realm.json" \
+  "$HERE/../components/examples/saas-realm.json" <<'PY'
+import copy
 import sys
 import json
 import yaml
@@ -44,6 +47,9 @@ keycloak_init_secret_names = {
     if "secretRef" in secret
 }
 assert "keycloak-redirect-uris-secret" in keycloak_init_secret_names
+keycloak_container = next(container for container in keycloak_pod_spec["containers"]
+                          if container["name"] == "keycloak")
+assert "--override false" in keycloak_container["args"][0]
 realm_volume = next(volume for volume in keycloak_pod_spec["volumes"]
                     if volume["name"] == "realm-import-source")
 assert realm_volume["configMap"]["name"] != "keycloak-realm-import"
@@ -86,6 +92,12 @@ assert admin_client["serviceAccountsEnabled"] is True
 service_account = next(user for user in realm["users"]
                        if user["serviceAccountClientId"] == "keycloak-redirect-uris")
 assert service_account["clientRoles"]["realm-management"] == ["view-clients", "manage-clients"]
+base_realm = json.load(open(sys.argv[3]))
+examples_realm = json.load(open(sys.argv[4]))
+expected_examples_realm = copy.deepcopy(base_realm)
+for key in ("identityProviders", "identityProviderMappers", "organizations"):
+    expected_examples_realm[key] = examples_realm[key]
+assert examples_realm == expected_examples_realm
 with open(f"{sys.argv[2]}/init.sh", "w") as stream:
     stream.write(init_script)
 with open(f"{sys.argv[2]}/update.sh", "w") as stream:

@@ -4,6 +4,40 @@ This app migrates the Keycloak component from
 `lphiri/maas-portal-integration-poc` into a dedicated Argo CD Application. The
 bootstrap ApplicationSet discovers `apps/keycloak/application.yaml` automatically.
 
+## Install profiles
+
+The app has two profiles. Each profile is a kustomize overlay.
+
+- `overlays/default` installs Keycloak and the example realms. It adds the
+  `grid-tenant-1-idp` and `grid-tenant-2-idp` realms, the example identity
+  providers and organizations in the `saas` realm, and the two example signing
+  keys. This is the default.
+- `overlays/core` installs Keycloak and only the `saas` broker realm. The core
+  realm has the broker client and its signing key. It has no identity
+  providers, organizations, or example tenants.
+
+The `saas` broker mints `org_id` from the identity provider binding. The token
+carries flat `org_id`, `org_name`, and `roles` claims and plain `groups`.
+
+To install only the core realm, set the keycloak Application source path to
+`apps/keycloak/overlays/core`. The default path is
+`apps/keycloak/overlays/default`.
+
+## Direct install
+
+For a cluster without Argo CD, run:
+
+```sh
+apps/keycloak/install.sh
+```
+
+Use `--render` to print the manifests without applying them. The script uses
+the default profile and installs in the `maas-db` namespace. It reads the Route
+host assigned by OpenShift and creates the `keycloak-public-url` ConfigMap. It
+does not install or use Argo CD or ACM. It still requires the CloudNativePG
+cluster, External Secrets, and cert-manager to be installed.
+The direct installer creates namespace `maas-db` when it does not exist.
+
 ## Topology
 
 - Keycloak runs in `maas-db` on the GitOps hub cluster, while remaining a
@@ -13,8 +47,8 @@ bootstrap ApplicationSet discovers `apps/keycloak/application.yaml` automaticall
   and database without sharing credentials with the API database user.
 - Keycloak connects to `maas-db-rw` with TLS and verifies the server against
   the existing `maas-db-ca` Secret.
-- The Deployment imports the `saas`, `grid-tenant-1-idp`, and
-  `grid-tenant-2-idp` realms on first startup.
+- The default install imports the example realms and the core `saas` broker
+  realm when they do not exist. The `core` overlay excludes the examples.
 - The upstream example `AITenant` resource is intentionally not applied by this
   app; the tenant-facing application should own its consumer configuration.
 
@@ -85,9 +119,9 @@ redirect URIs to:
 - `http://localhost:8000/callback` for the browserless smoke test.
 
 The job replaces the complete redirect list, so removing a cluster's ingress or
-combined role removes its callback on the next run. A Keycloak restart imports
-the realm from Git and resets the client to the smoke-test redirect; the next
-CronJob run restores the cluster callbacks.
+combined role removes its callback on the next run. A Keycloak restart does not
+re-import an existing realm, so the CronJob continues to maintain the live
+redirect list.
 
 The updater authenticates with the realm-scoped `keycloak-redirect-uris`
 service account, whose generated client secret is stored in the dedicated
@@ -107,13 +141,10 @@ by the three realm-specific keystores.
 
 Realm imports replace `${KEYCLOAK_PUBLIC_URL}` with the value from the
 public-URL ConfigMap and the broker/client/test-user keys with values from the
-Keycloak Secret. Keycloak starts with `kc.sh import --override true`, so every start rebuilds
-the imported realms from their files: edits to an import file take effect on
-the next restart, and anything created at runtime in those realms (the console
-backend's user, organizations made in the console) is lost on restart. Rerun
-apps/console/create-secrets.sh after a Keycloak restart, with the same
-`KEYCLOAK_BACKEND_URL` and `CURL_CA_BUNDLE` as before: it recreates the backend's
-user, not the organizations.
+Keycloak Secret. Keycloak starts with `kc.sh import --override false`, so it
+skips a realm that already exists. Runtime changes in an existing realm survive
+a restart. Use a planned Keycloak export/import to apply later edits from Git
+to an existing realm.
 
 ## Validation
 

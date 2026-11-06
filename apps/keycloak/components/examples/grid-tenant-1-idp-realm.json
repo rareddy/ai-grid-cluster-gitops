@@ -38,14 +38,14 @@
           }
         },
         {
-          "name": "MaaS organization transport",
+          "name": "MaaS roles",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usermodel-attribute-mapper",
           "config": {
-            "user.attribute": "maas_orgs_json",
-            "claim.name": "https://redhat\\.com/maas/orgs",
+            "user.attribute": "maas_roles",
+            "claim.name": "roles",
             "jsonType.label": "String",
-            "multivalued": "false",
+            "multivalued": "true",
             "id.token.claim": "true",
             "userinfo.token.claim": "true",
             "access.token.claim": "false"
@@ -111,12 +111,10 @@
       ],
       "attributes": {
         "maas_groups": [
-          "42c3e46f-2477-44d7-a85b-d3b43f6b31fa/ai-grid-admins",
-          "42c3e46f-2477-44d7-a85b-d3b43f6b31fa/ai-grid-users"
+          "ai-grid-admins",
+          "ai-grid-users"
         ],
-        "maas_orgs_json": [
-          "[{\"organization_id\":\"42c3e46f-2477-44d7-a85b-d3b43f6b31fa\",\"roles\":[\"admins\"]}]"
-        ]
+        "maas_roles": ["admins"]
       },
       "credentials": [
         {

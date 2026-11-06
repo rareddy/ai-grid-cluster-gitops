@@ -16,5 +16,3 @@ configMapGenerator:
         argocd.argoproj.io/sync-wave: "2"
     files:
       - manifests/realms/saas-realm.json
-      - manifests/realms/grid-tenant-1-idp-realm.json
-      - manifests/realms/grid-tenant-2-idp-realm.json

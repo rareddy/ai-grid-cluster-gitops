@@ -98,10 +98,8 @@ on every cluster, within the limits `apps/acm-models` sets. Never give that
 token access to this repository: Argo CD applies this repository with
 cluster-admin rights.
 
-## Known limitation: Keycloak recreates realm saas on every start
+## Keycloak restart behavior
 
-`apps/keycloak` runs `kc.sh import --override true` on each start, so realm
-`saas` is rebuilt from its import file. The backend's Keycloak user and any
-organization made in the console are lost whenever Keycloak restarts. Rerun
-`create-secrets.sh` after a restart to recreate the backend's user (it keeps
-its other Secrets). Organizations made in the console have to be made again.
+The default `apps/keycloak` profile imports its realms only when they do not
+exist. The backend's Keycloak user and organizations made in the console
+survive a Keycloak restart.
