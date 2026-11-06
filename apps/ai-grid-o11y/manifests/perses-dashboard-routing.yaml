@@ -1,0 +1,1099 @@
+apiVersion: perses.dev/v1alpha2
+kind: PersesDashboard
+metadata:
+  name: dashboard-6-ai-grid-routing-admin
+  namespace: redhat-ods-monitoring
+spec:
+  config:
+    display:
+      name: AI Grid routing
+      description: 'Why each site''s grid gateway sent requests where it did, read from the hub: the outcome, how the candidate was chosen, the load and capacity it read, and how fresh those readings were.
+        Cluster is the gateway''s site; backend is the candidate it routed to.'
+    duration: 1h
+    variables:
+    - kind: ListVariable
+      spec:
+        name: cluster_name
+        display:
+          name: Cluster
+          description: The gateway's own cluster, the ACM managed cluster name.
+        allowMultiple: true
+        allowAllValue: true
+        customAllValue: .*
+        defaultValue: $__all
+        plugin:
+          kind: PrometheusLabelValuesVariable
+          spec:
+            datasource: &id001
+              kind: PrometheusDatasource
+              name: cluster-prometheus-datasource
+            labelName: cluster
+            matchers:
+            - grid_route_site_rho
+    - kind: ListVariable
+      spec:
+        name: site
+        display:
+          name: Site
+          description: Grid sites this gateway routes to.
+        allowMultiple: true
+        allowAllValue: true
+        customAllValue: .*
+        defaultValue: $__all
+        plugin:
+          kind: PrometheusLabelValuesVariable
+          spec:
+            datasource: *id001
+            labelName: site
+            matchers:
+            - grid_route_site_score{site!="",cluster=~"$cluster_name"}
+    - kind: ListVariable
+      spec:
+        name: backend
+        display:
+          name: Backend cluster
+          description: The candidate cluster the gateway routed to, the gateway's cluster label renamed to backend by its ServiceMonitor.
+        allowMultiple: true
+        allowAllValue: true
+        customAllValue: .*
+        defaultValue: $__all
+        plugin:
+          kind: PrometheusLabelValuesVariable
+          spec:
+            datasource: *id001
+            labelName: backend
+            matchers:
+            - grid_route_site_score{site=~"$site",cluster=~"$cluster_name"}
+    panels:
+      decided:
+        kind: Panel
+        spec:
+          display:
+            name: Requests decided (requests/sec)
+            description: Requests this gateway decided per second, routed or refused.
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format:
+                unit: decimal
+                decimalPlaces: 2
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: sum(rate(grid_route_decisions_total{cluster=~"$cluster_name"}[$__rate_interval]))
+      refusedRatio:
+        kind: Panel
+        spec:
+          display:
+            name: Refused
+            description: 'Share of decisions answered without routing: no ready site, no route, a bad request, or shed. A request that names no model, such as GET /v1/models from a client health check,
+              counts as a bad request.'
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format:
+                unit: percent-decimal
+                decimalPlaces: 1
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: (sum(rate(grid_route_decisions_total{reason=~"not_ready|no_route|bad_request|shed",cluster=~"$cluster_name"}[$__rate_interval]))) / (sum(rate(grid_route_decisions_total{cluster=~"$cluster_name"}[$__rate_interval]))
+                    > 0)
+      fallbackRatio:
+        kind: Panel
+        spec:
+          display:
+            name: Sent to a demoted site
+            description: Share of decisions that went to a demoted site because no healthy site was left.
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format:
+                unit: percent-decimal
+                decimalPlaces: 1
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: (sum(rate(grid_route_decisions_total{reason="fallback",cluster=~"$cluster_name"}[$__rate_interval]))) / (sum(rate(grid_route_decisions_total{cluster=~"$cluster_name"}[$__rate_interval]))
+                    > 0)
+      shedding:
+        kind: Panel
+        spec:
+          display:
+            name: Models shedding
+            description: 'Models this gateway is shedding now: every healthy site serving them is past full.'
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format:
+                unit: decimal
+                decimalPlaces: 0
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: count(max by (model) (grid_route_shedding{cluster=~"$cluster_name"}) == 1) or vector(0)
+      sitesFull:
+        kind: Panel
+        spec:
+          display:
+            name: Sites full
+            description: Candidates at their ceiling with work waiting for 5 s. This reading has no hold and flips near the ceiling. A model sheds only when every site stays full, so read Shedding for the
+              decision.
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format:
+                unit: decimal
+                decimalPlaces: 0
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: count(max by (backend) (grid_route_site_full{site=~"$site",backend=~"$backend",cluster=~"$cluster_name"}) == 1) or vector(0)
+      oldestReading:
+        kind: Panel
+        spec:
+          display:
+            name: Oldest reading
+            description: Age of the oldest load reading any decision used. A large value means a site is routed on stale data.
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format:
+                unit: seconds
+                decimalPlaces: 1
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: max(grid_route_site_reading_age_seconds{site=~"$site",backend=~"$backend",cluster=~"$cluster_name"})
+      kvCacheHit:
+        kind: Panel
+        spec:
+          display:
+            name: KV cache hit
+            description: Share of prompt tokens the serving engines found in their prefix cache, as vLLM reports it, across every engine this Prometheus scrapes.
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format:
+                unit: percent-decimal
+                decimalPlaces: 1
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: sum(rate({__name__=~"kserve_vllm:prefix_cache_hits(_total)?|vllm:prefix_cache_hits(_total)?",cluster=~"$cluster_name"}[$__rate_interval])) / (sum(rate({__name__=~"kserve_vllm:prefix_cache_queries(_total)?|vllm:prefix_cache_queries(_total)?",cluster=~"$cluster_name"}[$__rate_interval]))
+                    > 0)
+      kvCacheHitPredicted:
+        kind: Panel
+        spec:
+          display:
+            name: KV cache hit (EPP predicted)
+            description: Share of prompt tokens the endpoint picker expected to be cached on the endpoint it chose. An estimate from its prefix index, not what the engines report.
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format:
+                unit: percent-decimal
+                decimalPlaces: 1
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: sum(rate(llm_d_epp_prefix_predicted_cached_tokens_sum{cluster=~"$cluster_name"}[$__rate_interval])) / (sum(rate(llm_d_epp_prefix_prompt_tokens_sum{cluster=~"$cluster_name"}[$__rate_interval]))
+                    > 0)
+      routedPerCandidate:
+        kind: Panel
+        spec:
+          display:
+            name: Routed per candidate (requests/sec)
+            description: Requests sent to each site and cluster.
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend:
+                position: bottom
+                mode: list
+                values: []
+              yAxis:
+                format:
+                  unit: decimal
+                  decimalPlaces: 2
+                min: 0
+              visual:
+                display: line
+                lineWidth: 0.25
+                areaOpacity: 1
+                connectNulls: false
+                stack: all
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: sum by (site, backend) (rate(grid_route_decisions_total{site=~"$site",backend=~"$backend",reason=~"routed|fallback",cluster=~"$cluster_name"}[$__rate_interval]))
+                  seriesNameFormat: '{{site}} {{backend}}'
+      decisionsByReason:
+        kind: Panel
+        spec:
+          display:
+            name: Decisions by outcome (requests/sec)
+            description: 'routed: a healthy site. fallback: a demoted site. not_ready: every candidate excluded (503). no_route: no route from this gateway (503). bad_request: no model or an unknown one
+              (400/404). shed: every healthy site past full (429).'
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend:
+                position: bottom
+                mode: list
+                values: []
+              yAxis:
+                format:
+                  unit: decimal
+                  decimalPlaces: 2
+                min: 0
+              visual:
+                display: line
+                lineWidth: 0.25
+                areaOpacity: 1
+                connectNulls: false
+                stack: all
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: sum by (reason) (rate(grid_route_decisions_total{cluster=~"$cluster_name"}[$__rate_interval]))
+                  seriesNameFormat: '{{reason}}'
+      selectionPath:
+        kind: Panel
+        spec:
+          display:
+            name: How the site was chosen (requests/sec)
+            description: 'two_choices: three or more sites with room, the lower load of two drawn by capacity. between_two: two sites with room, weighted by capacity over 1 + load. lone: one site with room.
+              by_capacity: no site with room, drawn by capacity among sites not full.'
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend:
+                position: bottom
+                mode: list
+                values: []
+              yAxis:
+                format:
+                  unit: decimal
+                  decimalPlaces: 2
+                min: 0
+              visual:
+                display: line
+                lineWidth: 0.25
+                areaOpacity: 1
+                connectNulls: false
+                stack: all
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: sum by (path) (rate(grid_route_selections_total{cluster=~"$cluster_name"}[$__rate_interval]))
+                  seriesNameFormat: '{{path}}'
+      prefixAffinity:
+        kind: Panel
+        spec:
+          display:
+            name: Prompt affinity (requests/sec)
+            description: 'sticky: kept to the sites holding the prompt. load_override: their queue outweighed the match. exploration: sent elsewhere to learn. no_match: no site held the prompt. not_applicable:
+              fewer than two sites with room.'
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend:
+                position: bottom
+                mode: list
+                values: []
+              yAxis:
+                format:
+                  unit: decimal
+                  decimalPlaces: 2
+                min: 0
+              visual:
+                display: line
+                lineWidth: 0.25
+                areaOpacity: 1
+                connectNulls: false
+                stack: all
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: sum by (outcome) (rate(grid_route_prefix_affinity_total{cluster=~"$cluster_name"}[$__rate_interval]))
+                  seriesNameFormat: '{{outcome}}'
+      prefixIndexFill:
+        kind: Panel
+        spec:
+          display:
+            name: Prompt index fill
+            description: Keys held over capacity, for the fullest gateway replica. Each replica keeps its own index. Expired keys count until displaced or re-sent.
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend:
+                position: bottom
+                mode: list
+                values: []
+              yAxis:
+                format:
+                  unit: percent-decimal
+                min: 0
+              visual:
+                display: line
+                lineWidth: 1.5
+                areaOpacity: 0
+                connectNulls: false
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: max by (backend) (grid_route_prefix_index_entries{backend=~"$backend",cluster=~"$cluster_name"} / (grid_route_prefix_index_capacity{backend=~"$backend",cluster=~"$cluster_name"}
+                    > 0))
+                  seriesNameFormat: '{{backend}}'
+      prefixIndexEvictions:
+        kind: Panel
+        spec:
+          display:
+            name: Prompt index evictions (requests/sec)
+            description: 'capacity: a full index pushed out a live key, so raise the prefix affinity capacity. ttl: a turn arrived after its key expired with nothing waiting on it, so turns arrive late
+              and capacity does not fix it. pending: an expired key was pushed out while a request still waited on it, so responses are slow or lost. forgotten: failed or refused requests withdrew their
+              keys, so it tracks backend errors.'
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend:
+                position: bottom
+                mode: list
+                values: []
+              yAxis:
+                format:
+                  unit: decimal
+                  decimalPlaces: 2
+                min: 0
+              visual:
+                display: line
+                lineWidth: 0.25
+                areaOpacity: 1
+                connectNulls: false
+                stack: all
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: sum by (backend, reason) (rate(grid_route_prefix_index_evictions_total{backend=~"$backend",cluster=~"$cluster_name"}[$__rate_interval]))
+                  seriesNameFormat: '{{backend}} {{reason}}'
+      rho:
+        kind: Panel
+        spec:
+          display:
+            name: Load used to choose
+            description: 'Saturation the draw weighs each candidate by: the nearer of its counted and reported load, smoothed. 1 means no room. A gap means unmeasured.'
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend:
+                position: bottom
+                mode: list
+                values: []
+              yAxis:
+                format:
+                  unit: decimal
+                min: 0
+              visual:
+                display: line
+                lineWidth: 1.5
+                areaOpacity: 0
+                connectNulls: false
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: max by (site, backend) (grid_route_site_rho{site=~"$site",backend=~"$backend",cluster=~"$cluster_name"})
+                  seriesNameFormat: '{{site}} {{backend}}'
+      rhoSources:
+        kind: Panel
+        spec:
+          display:
+            name: 'Load: reported against counted'
+            description: 'Reported: the site''s own KV cache use plus its spread. Counted: requests in flight over the ceiling. The nearer one sets the load used to choose.'
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend:
+                position: bottom
+                mode: list
+                values: []
+              yAxis:
+                format:
+                  unit: decimal
+                min: 0
+              visual:
+                display: line
+                lineWidth: 1.5
+                areaOpacity: 0
+                connectNulls: false
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: max by (site, backend) (grid_route_site_rho_reported{site=~"$site",backend=~"$backend",cluster=~"$cluster_name"})
+                  seriesNameFormat: reported {{site}} {{backend}}
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: max by (site, backend) (grid_route_site_rho_counted{site=~"$site",backend=~"$backend",cluster=~"$cluster_name"})
+                  seriesNameFormat: counted {{site}} {{backend}}
+      weight:
+        kind: Panel
+        spec:
+          display:
+            name: Capacity weight
+            description: Capacity the draw weights each candidate by. A gap means unmeasured; the draw then uses the mean of the known weights.
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend:
+                position: bottom
+                mode: list
+                values: []
+              yAxis:
+                format:
+                  unit: decimal
+                min: 0
+              visual:
+                display: line
+                lineWidth: 1.5
+                areaOpacity: 0
+                connectNulls: false
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: max by (site, backend) (grid_route_site_weight{site=~"$site",backend=~"$backend",cluster=~"$cluster_name"})
+                  seriesNameFormat: '{{site}} {{backend}}'
+      inFlight:
+        kind: Panel
+        spec:
+          display:
+            name: Capacity the selector believed
+            description: Requests in flight at each candidate against the ceiling the selector used, with the soft bound it learned from congestion and the hard bound the site declared. In flight near the
+              ceiling with the soft bound below the hard one means the selector capped the site below what it declared.
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend:
+                position: bottom
+                mode: list
+                values: []
+              yAxis:
+                format:
+                  unit: decimal
+                min: 0
+              visual:
+                display: line
+                lineWidth: 1.5
+                areaOpacity: 0
+                connectNulls: false
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: max by (site, backend) (grid_route_site_in_flight{site=~"$site",backend=~"$backend",cluster=~"$cluster_name"})
+                  seriesNameFormat: in flight {{site}} {{backend}}
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: max by (site, backend) (grid_route_site_ceiling{site=~"$site",backend=~"$backend",cluster=~"$cluster_name"})
+                  seriesNameFormat: ceiling {{site}} {{backend}}
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: max by (site, backend) (grid_route_site_ceiling_soft{site=~"$site",backend=~"$backend",cluster=~"$cluster_name"})
+                  seriesNameFormat: ceiling soft {{site}} {{backend}}
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: max by (site, backend) (grid_route_site_ceiling_hard{site=~"$site",backend=~"$backend",cluster=~"$cluster_name"})
+                  seriesNameFormat: ceiling hard {{site}} {{backend}}
+      score:
+        kind: Panel
+        spec:
+          display:
+            name: Queue score
+            description: Score each candidate ranks by in the current snapshot. A gap means excluded or demoted. A 1 on the unavailable line means the selector had no score for that candidate and could
+              only fall back.
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend:
+                position: bottom
+                mode: list
+                values: []
+              yAxis:
+                format:
+                  unit: decimal
+                min: 0
+              visual:
+                display: line
+                lineWidth: 1.5
+                areaOpacity: 0
+                connectNulls: false
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: max by (site, backend) (grid_route_site_score{site=~"$site",backend=~"$backend",cluster=~"$cluster_name"})
+                  seriesNameFormat: '{{site}} {{backend}}'
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: max by (site, backend) (grid_route_site_score_unavailable{site=~"$site",backend=~"$backend",cluster=~"$cluster_name"})
+                  seriesNameFormat: score unavailable {{site}} {{backend}}
+      full:
+        kind: Panel
+        spec:
+          display:
+            name: Full
+            description: 1 while a candidate has had a backlog at its ceiling long enough to shed.
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend:
+                position: bottom
+                mode: list
+                values: []
+              yAxis:
+                format:
+                  unit: decimal
+                max: 1
+                min: 0
+              visual:
+                display: line
+                lineWidth: 1.5
+                areaOpacity: 0
+                connectNulls: false
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: max by (site, backend) (grid_route_site_full{site=~"$site",backend=~"$backend",cluster=~"$cluster_name"})
+                  seriesNameFormat: '{{site}} {{backend}}'
+      silent:
+        kind: Panel
+        spec:
+          display:
+            name: Silent
+            description: 1 while a site that has published sent nothing within the freshness window. A silent site takes no request while a live one can.
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend:
+                position: bottom
+                mode: list
+                values: []
+              yAxis:
+                format:
+                  unit: decimal
+                max: 1
+                min: 0
+              visual:
+                display: line
+                lineWidth: 1.5
+                areaOpacity: 0
+                connectNulls: false
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: max by (site, backend) (grid_route_site_silent{site=~"$site",backend=~"$backend",cluster=~"$cluster_name"})
+                  seriesNameFormat: '{{site}} {{backend}}'
+      readingAge:
+        kind: Panel
+        spec:
+          display:
+            name: Age of the reading each decision used
+            description: A line that only climbs is a frozen reading, not a steady one.
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend:
+                position: bottom
+                mode: list
+                values: []
+              yAxis:
+                format:
+                  unit: seconds
+                min: 0
+              visual:
+                display: line
+                lineWidth: 1.5
+                areaOpacity: 0
+                connectNulls: false
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: max by (site, backend) (grid_route_site_reading_age_seconds{site=~"$site",backend=~"$backend",cluster=~"$cluster_name"})
+                  seriesNameFormat: '{{site}} {{backend}}'
+      roundAge:
+        kind: Panel
+        spec:
+          display:
+            name: Since the last poll of each peer
+            description: Seconds since this site's operator last polled each peer. Empty for this site.
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend:
+                position: bottom
+                mode: list
+                values: []
+              yAxis:
+                format:
+                  unit: seconds
+                min: 0
+              visual:
+                display: line
+                lineWidth: 1.5
+                areaOpacity: 0
+                connectNulls: false
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: max by (site) (grid_route_site_round_age_seconds{site=~"$site",cluster=~"$cluster_name"})
+                  seriesNameFormat: '{{site}}'
+      signalsPoll:
+        kind: Panel
+        spec:
+          display:
+            name: Gateway polls of its operator (requests/sec)
+            description: The gateway reads every site's load from its own operator. Anything but success leaves readings to age.
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend:
+                position: bottom
+                mode: list
+                values: []
+              yAxis:
+                format:
+                  unit: decimal
+                  decimalPlaces: 2
+                min: 0
+              visual:
+                display: line
+                lineWidth: 0.25
+                areaOpacity: 1
+                connectNulls: false
+                stack: all
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: sum by (result) (rate(grid_signals_poll_total{cluster=~"$cluster_name"}[$__rate_interval]))
+                  seriesNameFormat: '{{result}}'
+      ingestDropped:
+        kind: Panel
+        spec:
+          display:
+            name: Readings refused (requests/sec)
+            description: Rows the gateway dropped instead of routing on them, by reason.
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend:
+                position: bottom
+                mode: list
+                values: []
+              yAxis:
+                format:
+                  unit: decimal
+                  decimalPlaces: 2
+                min: 0
+              visual:
+                display: line
+                lineWidth: 1.5
+                areaOpacity: 0
+                connectNulls: false
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: sum by (reason) (rate(grid_signals_ingest_dropped_total{cluster=~"$cluster_name"}[$__rate_interval])) or label_replace(vector(0), "reason", "none", "", "")
+                  seriesNameFormat: '{{reason}}'
+      ttft:
+        kind: Panel
+        spec:
+          display:
+            name: Time to first token p95
+            description: Per model server namespace, so a site's latency sits beside the share it was sent.
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend:
+                position: bottom
+                mode: list
+                values: []
+              yAxis:
+                format:
+                  unit: seconds
+                min: 0
+              visual:
+                display: line
+                lineWidth: 1.5
+                areaOpacity: 0
+                connectNulls: false
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: histogram_quantile(0.95, sum by (le, cluster, namespace) (rate({__name__=~"kserve_vllm:time_to_first_token_seconds_bucket|vllm:time_to_first_token_seconds_bucket",cluster=~"$cluster_name"}[$__rate_interval])))
+                  seriesNameFormat: '{{cluster}} {{namespace}}'
+      queueTime:
+        kind: Panel
+        spec:
+          display:
+            name: Queue time mean
+            description: Time requests waited in the model server before running.
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend:
+                position: bottom
+                mode: list
+                values: []
+              yAxis:
+                format:
+                  unit: seconds
+                min: 0
+              visual:
+                display: line
+                lineWidth: 1.5
+                areaOpacity: 0
+                connectNulls: false
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource: *id001
+                  query: sum by (cluster, namespace) (rate({__name__=~"kserve_vllm:request_queue_time_seconds_sum|vllm:request_queue_time_seconds_sum",cluster=~"$cluster_name"}[$__rate_interval])) / (sum
+                    by (cluster, namespace) (rate({__name__=~"kserve_vllm:request_queue_time_seconds_count|vllm:request_queue_time_seconds_count",cluster=~"$cluster_name"}[$__rate_interval])) > 0)
+                  seriesNameFormat: '{{cluster}} {{namespace}}'
+    layouts:
+    - kind: Grid
+      spec:
+        display:
+          title: Verdict
+          collapse:
+            open: true
+        items:
+        - x: 0
+          y: 0
+          width: 6
+          height: 4
+          content:
+            $ref: '#/spec/panels/decided'
+        - x: 6
+          y: 0
+          width: 6
+          height: 4
+          content:
+            $ref: '#/spec/panels/refusedRatio'
+        - x: 12
+          y: 0
+          width: 6
+          height: 4
+          content:
+            $ref: '#/spec/panels/fallbackRatio'
+        - x: 18
+          y: 0
+          width: 6
+          height: 4
+          content:
+            $ref: '#/spec/panels/shedding'
+        - x: 0
+          y: 4
+          width: 6
+          height: 4
+          content:
+            $ref: '#/spec/panels/sitesFull'
+        - x: 6
+          y: 4
+          width: 6
+          height: 4
+          content:
+            $ref: '#/spec/panels/oldestReading'
+        - x: 12
+          y: 4
+          width: 6
+          height: 4
+          content:
+            $ref: '#/spec/panels/kvCacheHit'
+        - x: 18
+          y: 4
+          width: 6
+          height: 4
+          content:
+            $ref: '#/spec/panels/kvCacheHitPredicted'
+    - kind: Grid
+      spec:
+        display:
+          title: Where requests went
+          collapse:
+            open: true
+        items:
+        - x: 0
+          y: 4
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/routedPerCandidate'
+        - x: 12
+          y: 4
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/decisionsByReason'
+        - x: 0
+          y: 12
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/selectionPath'
+        - x: 12
+          y: 12
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/prefixAffinity'
+    - kind: Grid
+      spec:
+        display:
+          title: Prompt index
+          collapse:
+            open: true
+        items:
+        - x: 0
+          y: 20
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/prefixIndexFill'
+        - x: 12
+          y: 20
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/prefixIndexEvictions'
+    - kind: Grid
+      spec:
+        display:
+          title: Why this site
+          collapse:
+            open: true
+        items:
+        - x: 0
+          y: 20
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/rho'
+        - x: 12
+          y: 20
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/rhoSources'
+        - x: 0
+          y: 28
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/weight'
+        - x: 12
+          y: 28
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/inFlight'
+        - x: 0
+          y: 36
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/score'
+        - x: 12
+          y: 36
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/full'
+        - x: 0
+          y: 44
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/silent'
+    - kind: Grid
+      spec:
+        display:
+          title: Can the readings be trusted
+          collapse:
+            open: true
+        items:
+        - x: 0
+          y: 52
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/readingAge'
+        - x: 12
+          y: 52
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/roundAge'
+        - x: 0
+          y: 60
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/signalsPoll'
+        - x: 12
+          y: 60
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/ingestDropped'
+    - kind: Grid
+      spec:
+        display:
+          title: What it cost
+          collapse:
+            open: true
+        items:
+        - x: 0
+          y: 68
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/ttft'
+        - x: 12
+          y: 68
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/queueTime'
