@@ -896,7 +896,7 @@ spec:
     - kind: Grid
       spec:
         display:
-          title: Verdict
+          title: Summary
           collapse:
             open: true
         items:
@@ -951,7 +951,7 @@ spec:
     - kind: Grid
       spec:
         display:
-          title: Where requests went
+          title: Site routing
           collapse:
             open: true
         items:
@@ -1001,7 +1001,7 @@ spec:
     - kind: Grid
       spec:
         display:
-          title: Why this site
+          title: Site selection signals
           collapse:
             open: true
         items:
@@ -1050,7 +1050,7 @@ spec:
     - kind: Grid
       spec:
         display:
-          title: Can the readings be trusted
+          title: Signal freshness
           collapse:
             open: true
         items:
@@ -1081,7 +1081,7 @@ spec:
     - kind: Grid
       spec:
         display:
-          title: What it cost
+          title: Latency
           collapse:
             open: true
         items:
