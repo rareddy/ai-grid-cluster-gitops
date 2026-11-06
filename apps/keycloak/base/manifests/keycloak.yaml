@@ -14,6 +14,9 @@ spec:
   # them must not see.
   strategy:
     type: Recreate
+    # Clear the default rollingUpdate settings an existing Deployment still carries;
+    # without this, apply fails with "rollingUpdate: Forbidden ... when strategy type is 'Recreate'".
+    rollingUpdate: null
   selector:
     matchLabels:
       app.kubernetes.io/name: keycloak
