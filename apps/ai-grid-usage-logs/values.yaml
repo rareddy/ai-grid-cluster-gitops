@@ -113,14 +113,16 @@ spokePolicy:
     # Same reason as createNamespace above: apps/ai-grid-policies already binds
     # global into this namespace.
     createClusterSetBinding: false
-    # Left at the chart default, ai-grid.redhat.com/maas=true: a site forwards
-    # usage logs only once labelled, which is deliberately separate from
-    # ai-grid/role. Overriding matchLabels here would ADD to the default rather
-    # than replace it, and the Placement would then match nothing.
+    # Usage logs originate at MaaS gateways on ingress and combined sites.
+    # Null removes the chart default label when Helm merges the maps.
     excludeLocalCluster: true
     matchLabels:
       ai-grid.redhat.com/maas: null
-      ai-grid/role: combined
+      ai-grid/enabled: "true"
+    matchExpressions:
+      - key: ai-grid/role
+        operator: In
+        values: [ingress, combined]
 
   spoke:
     monitoringNamespace: redhat-ods-monitoring

@@ -36,7 +36,9 @@ spec:
     # store/lokistack.yaml, no store/object-storage.yaml, no values.schema.json
     # -- so it cannot render the store at all. Retarget once it catches up.
     - repoURL: https://github.com/opendatahub-io/odh-gitops.git
-      targetRevision: main
+      # Temporary immutable pin to odh-gitops PR #280 for role-set placement.
+      # Return to main after that PR merges and main includes this change.
+      targetRevision: 81890625358fed2d11f38736abef941de95e9798
       path: charts/rhai-on-openshift-chart/charts/ai-grid-o11y-hub
       helm:
         releaseName: ai-grid-usage-logs
