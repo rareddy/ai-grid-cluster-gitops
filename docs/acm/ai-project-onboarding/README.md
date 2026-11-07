@@ -21,9 +21,9 @@ The label is the only switch. On every cluster in the grid it gives the namespac
 
 ## Deploy a model
 
-Use the provider console, which writes the model to the catalog repository, or commit an `LLMInferenceService` to a labelled namespace. See [apps/acm-models](../../../apps/acm-models/README.md) for the catalog, its AppProjects and the sample models.
+Use the provider console, which writes the model to the catalog repository, or commit an `LLMInferenceService` to a labelled namespace. See [apps/acm-models](../../../apps/acm-models/README.md) for the catalog and its AppProjects. Models are not installed independently as demos.
 
-A minimal model, as the lab runs it:
+A minimal model example (not installed automatically):
 
 ```yaml
 apiVersion: serving.kserve.io/v1alpha2
@@ -57,7 +57,7 @@ spec:
 - router.gateway attaches the model to the inference gateway, which the grid dials.
 - The scheduler argument serves its metrics over TLS, until the platform preset does.
 
-The working sample is [apps/acm-models/facebook-opt-125m](../../../apps/acm-models/facebook-opt-125m/10-facebook-opt-125m-cpu.yaml).
+For catalog-managed models, create and delete them through the provider console so runtime and MaaS resources have a single owner.
 
 Nothing else per model. The grid operator derives the gateway's dial from the published InferenceProvider. The dial goes to the serving gateway at the model's publisher path, as the grid model client, so the inference scheduler picks the pod. The serving gateway authorizes that path with a review for post on the model. The rhoai-prerequisites policy grants that verb to the grid model client in every labelled namespace, since the model controller's own Role covers another path (odh-model-controller#996).
 

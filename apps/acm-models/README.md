@@ -1,13 +1,15 @@
-# Internal model deployments
+# Catalog model deployments
 
-This app owns the internal `LLMInferenceService` deployment and its
-model-facing MaaS resources. Supporting namespaces, NetworkPolicies, and the
-Grid `ExternalProvider` are owned by the RHOAI apps.
+This app connects the provider console's catalog to AI Grid sites. The catalog
+owns model deployments, MaaS entries, subscriptions and access policies; no
+sample models or demo access grants are installed independently of it.
+Supporting namespaces, NetworkPolicies, and the Grid `ExternalProvider` are
+owned by the RHOAI apps.
 
-The sample model goes to AI Grid sites where models run (Placement
-`ai-grid-inference`), and its MaaS objects to sites that run MaaS
-(`ai-grid-ingress`); both Placements are `apps/ai-grid-spokes`'. An unlabelled
-hub gets neither.
+Use the provider console to create models and subscriptions. Deleting a model
+removes its catalog manifests; Argo CD prunes its runtime and MaaS resources,
+and the controllers finish dependent-resource cleanup through finalizers.
+An empty catalog leaves no catalog model deployments or MaaS entries.
 
 ## Scheduler metrics
 
@@ -16,7 +18,7 @@ model controller publishes each provider's metrics endpoint from the scheduler
 Service and its metrics port. The RHOAI prerequisites policy admits
 `redhat-ai-grid` to that port.
 
-The model definitions enable the HTTPS listener with
+Model definitions should enable the HTTPS listener with
 `--metrics-cert-dir=/var/run/kserve/tls`, using the scheduler's existing serving
 certificate. The controller image pinned in `apps/rhoai/values.yaml` declares
 `appProtocol: https` from this setting and creates per-model ServiceMonitors
@@ -59,7 +61,7 @@ that repository, no cluster-scoped kinds, and only the kinds the console writes:
 - `acm-models-catalog-models`: LLMInferenceService and NetworkPolicy.
 - `acm-models-catalog-maas`: ExternalModel, MaaSModelRef, MaaSSubscription and MaaSAuthPolicy.
 
-A catalog file that collides with an object another Application manages, such as a sample model, stops that
+A catalog file that collides with an object another Application manages stops that
 cluster's catalog sync until it's fixed (`FailOnSharedResource`).
 
 Deletion differs by design. Deleting the models ApplicationSet, or a cluster's folder, leaves its models running
