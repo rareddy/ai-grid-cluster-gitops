@@ -32,5 +32,5 @@ global:
     # NOTE(khowell): testing a fix - to be reverted after https://github.com/opendatahub-io/models-as-a-service/pull/1853 and backport land
     - name: RELATED_IMAGE_ODH_MAAS_API_IMAGE
       value: quay.io/khowell_dev/maas-api:loki-access-proxy5
-    - name: RELATED_IMAGE_ODH_MAAS_API_IMAGE
+    - name: RELATED_IMAGE_ODH_MAAS_CONTROLLER_IMAGE
       value: quay.io/khowell_dev/maas-controller:loki-access-proxy5
