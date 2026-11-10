@@ -29,3 +29,8 @@ global:
   relatedImages:
     - name: RELATED_IMAGE_ODH_PRAXIS_AI_GRID_GATEWAY_IMAGE
       value: registry.redhat.io/rhoai/odh-praxis-ai-grid-gateway-rhel9@sha256:fa06fe6911c549583c8870c8ac5cae094108c40889357e273f313888b71d6633
+    # NOTE(khowell): testing a fix - to be reverted after https://github.com/opendatahub-io/models-as-a-service/pull/1853 and backport land
+    - name: RELATED_IMAGE_ODH_MAAS_API_IMAGE
+      value: quay.io/khowell_dev/maas-api:loki-access-proxy5
+    - name: RELATED_IMAGE_ODH_MAAS_API_IMAGE
+      value: quay.io/khowell_dev/maas-controller:loki-access-proxy5

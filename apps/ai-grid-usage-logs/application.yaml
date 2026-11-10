@@ -36,7 +36,8 @@ spec:
     # store/lokistack.yaml, no store/object-storage.yaml, no values.schema.json
     # -- so it cannot render the store at all. Retarget once it catches up.
     - repoURL: https://github.com/opendatahub-io/odh-gitops.git
-      targetRevision: main
+      # NOTE(khowell): to be reverted after https://github.com/opendatahub-io/odh-gitops/pull/283 and backport land
+      targetRevision: usage-logs-read-ca
       path: charts/rhai-on-openshift-chart/charts/ai-grid-o11y-hub
       helm:
         releaseName: ai-grid-usage-logs
