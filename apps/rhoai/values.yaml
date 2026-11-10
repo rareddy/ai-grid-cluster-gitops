@@ -18,6 +18,17 @@ operator:
       channel: stable-3.6
       # ACM owns this Red Hat managed Namespace; OSD rejects Argo writes to it.
       createNamespace: false
+      # NOTE(khowell): testing a fix - to be reverted after https://github.com/opendatahub-io/models-as-a-service/pull/1853 and backport land.
+      # These land as env on the rhods-operator Subscription, so the operator
+      # passes the test builds through to the maas-controller it deploys (and
+      # through it, to maas-api). global.relatedImages cannot do this: only the
+      # Argo-rendered praxis/grid subcharts read that list.
+      config:
+        env:
+          - name: RELATED_IMAGE_ODH_MAAS_API_IMAGE
+            value: quay.io/khowell_dev/maas-api:loki-access-proxy5
+          - name: RELATED_IMAGE_ODH_MAAS_CONTROLLER_IMAGE
+            value: quay.io/khowell_dev/maas-controller:loki-access-proxy5
 dependencies:
   opentelemetry:
     olm:
@@ -29,8 +40,3 @@ global:
   relatedImages:
     - name: RELATED_IMAGE_ODH_PRAXIS_AI_GRID_GATEWAY_IMAGE
       value: registry.redhat.io/rhoai/odh-praxis-ai-grid-gateway-rhel9@sha256:fa06fe6911c549583c8870c8ac5cae094108c40889357e273f313888b71d6633
-    # NOTE(khowell): testing a fix - to be reverted after https://github.com/opendatahub-io/models-as-a-service/pull/1853 and backport land
-    - name: RELATED_IMAGE_ODH_MAAS_API_IMAGE
-      value: quay.io/khowell_dev/maas-api:loki-access-proxy5
-    - name: RELATED_IMAGE_ODH_MAAS_CONTROLLER_IMAGE
-      value: quay.io/khowell_dev/maas-controller:loki-access-proxy5
