@@ -119,7 +119,8 @@ spokePolicy:
     # global into this namespace.
     createClusterSetBinding: false
 
-    # Enabled ingress and combined sites receive these credentials.
+    # The role is the whole predicate: a site receives these credentials if it is
+    # an ingress or combined site.
     #
     # `null` deletes the chart default, ai-grid.redhat.com/maas=true, rather than
     # overriding it. Helm merges maps, so leaving matchLabels out entirely would
@@ -142,7 +143,6 @@ spokePolicy:
     # ai-grid-ingress expresses this same role predicate the same way.
     matchLabels:
       ai-grid.redhat.com/maas: null
-      ai-grid/enabled: "true"
     matchExpressions:
       - key: ai-grid/role
         operator: In
