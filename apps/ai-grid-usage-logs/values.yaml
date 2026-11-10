@@ -80,14 +80,15 @@ spokePolicy:
   endpoint: '{{hub printf "https://%s/api/logs/v1/infrastructure/otlp" (index (lookup "route.openshift.io/v1" "Route" "redhat-ods-monitoring" "usage-logs").status.ingress 0).host hub}}'
 
   # Named ServiceAccount the hub templates above resolve as. Created, with its
-  # two narrowly scoped Roles, in manifests/20-hub-template-rbac.yaml.
+  # three narrowly scoped Roles, in manifests/20-hub-template-rbac.yaml.
   hubTemplateOptions:
     serviceAccountName: usage-logs-templating
 
   # The read credential: the same policy hands a spoke-side consumer — anything in
-  # redhat-ai-gateway-infra that queries the hub's store — the query endpoint and a
-  # read-only token. Same policy, so same Placement: a site gets both halves, and
-  # the consumer's namespace arrives with the spoke's own RHOAI install, so the
+  # redhat-ai-gateway-infra that queries the hub's store — the query endpoint, a
+  # read-only token, and the CA bundle that verifies the store Route's
+  # certificate. Same policy, so same Placement: a site gets all halves, and the
+  # consumer's namespace arrives with the spoke's own RHOAI install, so the
   # policy is NonCompliant there until that install runs — the same wait the
   # DSCInitialization patch has, and harmless for the same reason.
   readCredential:
@@ -100,7 +101,13 @@ spokePolicy:
     credentialSecretName: usage-logs-hub-read-credential
 
     # Defaults kept: usage-logs-loki in redhat-ai-gateway-infra on each spoke,
-    # with LOKI_READ_ENDPOINT and LOKI_READ_TOKEN as its keys.
+    # with LOKI_READ_ENDPOINT, LOKI_READ_TOKEN and LOKI_READ_CA as its keys. The
+    # CA key does not come from that Secret: it is a hub template resolved on
+    # every Policy render -- the store Route's `spec.tls.caCertificate` when the
+    # Loki operator set one, otherwise the cluster's default ingress certificate
+    # -- so it needs the templating ServiceAccount to also read the
+    # default-ingress-cert ConfigMap in openshift-config-managed (the third Role
+    # in manifests/20-hub-template-rbac.yaml).
 
   # apps/ai-grid-policies already owns this namespace. Creating it here as well
   # makes two Argo Applications claim one object, which Argo reports as a
