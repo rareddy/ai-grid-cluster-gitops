@@ -70,6 +70,10 @@ With more than 200 groups in one token, Entra leaves the `groups` claim out and 
 
 The `email` scope makes Entra put the user's email (their mail attribute) in the ID token, when the user has one ([Microsoft: ID token claims](https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference)). Entra sends no `email_verified` claim, so Keycloak marks the email verified when it creates the user ([Verified email](README.md#what-the-identity-provider-must-send)). That's also why the **User info URL** stays empty below: Entra's user info response has no `email_verified` either, nor `groups` or `roles`.
 
+### 6. Send `preferred_username`
+
+The `profile` scope makes Entra put `preferred_username` in the ID token. AI Grid uses it only as a display label. The user's stable identity is the broker subject, not this label.
+
 ## On the hub
 
 Store the client secret's **Value**, with no trailing newline ([step 3](README.md#3-store-the-client-secret-on-the-hub)):
@@ -105,7 +109,7 @@ These come from `https://login.microsoftonline.com/<tenant-id>/v2.0/.well-known/
 ## Check
 
 1. Sign in to the MaaS portal as one of the organization's admins ([step 5](README.md#5-sign-in)).
-2. In Keycloak's admin console (realm `saas`), the user's **Attributes** show `maas_roles` = `admins` and `maas_groups` = their groups.
+2. In Keycloak's admin console (realm `saas`), the user's **Attributes** show `maas_roles` = `admins`, `maas_groups` = their groups, and `maas_preferred_username` = the user's display label.
 3. Create a subscription for the organization with those group names ([step 6](README.md#6-grant-models)), and check that the portal lists its models.
 
 | If | Then |

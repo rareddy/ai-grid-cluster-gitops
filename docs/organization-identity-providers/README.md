@@ -13,8 +13,8 @@ sequenceDiagram
     User->>KC: 1. Enter an email, such as jane@acme.com
     KC->>User: 2. acme.com belongs to acme: redirect to its identity provider
     User->>IdP: 3. Sign in
-    IdP->>KC: 4. ID token: sub, email, groups, roles
-    KC->>MaaS: 5. Token: org_id, org_name, groups, roles
+    IdP->>KC: 4. ID token: sub, email, groups, roles, preferred_username
+    KC->>MaaS: 5. Token: org_id, org_name, groups, roles, preferred_username
 ```
 
 ## What the identity provider must send
@@ -27,10 +27,11 @@ The token that MaaS reads follows [ODH-ADR-MS-0007](https://github.com/opendatah
 | `email` | The user's email | The user's account in `saas`; its domain decides organization membership. |
 | `groups` | The user's group names, plain (`ai-grid-users`) | Subscriptions grant models to group names. |
 | `roles` | `admins` for the organization's admins | Admin features in the MaaS portal. |
+| `preferred_username` | The user's display label, for example `alice` | Shows a readable name in MaaS. This claim is optional. |
 
-AI Grid's mappers in Keycloak add `org_id` and `org_name` for the organization: the identity provider doesn't send them.
+AI Grid's mappers in Keycloak add `org_id` and `org_name` for the organization: the identity provider doesn't send them. The `tenant-demo` client emits `preferred_username` again for MaaS.
 
-Keycloak copies `groups` and `roles` at every sign-in through the identity provider, so a change at the identity provider takes effect at the user's next sign-in. A session that's already open, and its token refreshes, keep the old values until then.
+Keycloak copies `groups`, `roles`, and `preferred_username` at every sign-in through the identity provider. A change at the identity provider takes effect at the user's next sign-in. A session that's already open, and its token refreshes, keeps the old values until then.
 
 **Verified email.** The MaaS portal refuses a user whose email isn't verified. Keycloak trusts the identity provider's email:
 
@@ -108,13 +109,15 @@ An organization can be created without an identity provider, but one can only be
 
 ![The wizard's Review step listing every value, with the Create organization button marked 1](images/05-wizard-review.png)
 
-The console creates, in Keycloak, the organization, its identity provider, and the identity provider's four mappers: `AI Grid org id`, `AI Grid org name`, `AI Grid groups` and `AI Grid roles`. The organization's page then shows its details and the identity provider's settings (1) as they were at creation.
+The console creates, in Keycloak, the organization, its identity provider, and the identity provider's six mappers: `AI Grid org id`, `AI Grid org name`, `AI Grid groups`, `AI Grid roles`, `AI Grid local username`, and `AI Grid preferred username`. The organization's page then shows its details and the identity provider's settings (1) as they were at creation.
 
 ![An organization's page in the provider console, with its Identity provider section marked 1](images/06-organization-details.png)
 
-In Keycloak's admin console (realm `saas`, **Identity providers**, `<organization-name>`, **Mappers**), the four mappers (1):
+In Keycloak's admin console (realm `saas`, **Identity providers**, `<organization-name>`, **Mappers**), the AI Grid mappers (1):
 
-![Keycloak's Mappers tab of the identity provider, listing the four AI Grid mappers, marked 1](images/08-keycloak-idp-mappers.png)
+![Keycloak's Mappers tab of the identity provider, listing the first four AI Grid mappers, marked 1](images/08-keycloak-idp-mappers.png)
+
+The screenshot shows the first four mappers. The current list also includes `AI Grid local username` and `AI Grid preferred username`.
 
 The identity provider's settings can't be changed in the console afterwards, and the backend copies the client secret into Keycloak only at creation. To change a setting later, such as a rotated client secret, change it in Keycloak's admin console (realm `saas`, **Identity providers**, `<organization-name>`), and update the Secret on the hub to match. Saving the organization in the console (its domains) doesn't touch the identity provider or its mappers.
 
@@ -124,9 +127,11 @@ Open the MaaS portal on an ingress cluster, `https://maas.<cluster-apps-domain>/
 
 ![Keycloak's sign-in page asking for Username or email, the field marked 1](images/10-keycloak-login-email.png)
 
-To check what a user got, in Keycloak's admin console (realm `saas`): **Users**, the user, **Attributes**. `maas_org_name` (1), `maas_org_id` (2), `maas_groups` (3) and `maas_roles` (4) become the token's `org_name`, `org_id`, `groups` and `roles`.
+To check what a user got, open Keycloak's admin console for realm `saas`. Go to **Users**, the user, and **Attributes**. `maas_org_name` (1), `maas_org_id` (2), `maas_groups` (3), and `maas_roles` (4) become the token's `org_name`, `org_id`, `groups`, and `roles`. `maas_preferred_username` becomes `preferred_username`.
 
-![A user's Attributes tab in Keycloak, with maas_org_name, maas_org_id, maas_groups and maas_roles marked 1 to 4](images/07-keycloak-user-attributes.png)
+![A user's Attributes tab in Keycloak, with the first four maas attributes marked 1 to 4](images/07-keycloak-user-attributes.png)
+
+The screenshot shows the first four attributes. The current list also includes `maas_preferred_username`.
 
 ### 6. Grant models
 
@@ -140,7 +145,7 @@ In the provider console, create a subscription for the organization with the gro
 | Keycloak shows "We are sorry…" after the identity provider's sign-in | Keycloak couldn't get the token, most often a wrong client secret, such as one with a trailing newline. Keycloak's log has `IDENTITY_PROVIDER_LOGIN_ERROR`. Fix the secret in Keycloak ([step 4](#4-create-the-organization)). |
 | Create organization fails with `identity provider secret "<name>" not found` | The Secret isn't in `ai-grid-idp-secrets`, or has another name. Create it and retry: nothing was left behind. |
 | Create organization fails with `tenant "<name>" already exists` | The name, or one of the domains, is already used by another organization. |
-| "Account already exists" at the first sign-in | A `saas` user with the same email already exists, for example one created by hand. Remove or link that user in Keycloak. |
+| "Account already exists" at the first sign-in | A `saas` user with the same email already exists, for example one created by hand. Remove that user, then ask the user to sign in again. |
 | The portal refuses the user after sign-in | The email isn't verified: see [Verified email](#what-the-identity-provider-must-send). |
 | The user sees no models | `maas_groups` doesn't hold the subscription's group names, or the user hasn't signed in again since the change. |
 | A user who enters an email with no organization's domain sees other organizations' sign-in buttons | Keycloak lists every identity provider that isn't hidden on that page. Use a neutral Title. |
