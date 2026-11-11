@@ -562,14 +562,23 @@ spec:
           display:
             name: MaaS API availability
             description: >-
-              Share of the MaaS API scrape targets that are reporting as up.
+              Share of MaaS API scrape targets reporting as up, by cluster.
           plugin:
-            kind: StatChart
+            kind: TimeSeriesChart
             spec:
-              calculation: last-number
-              format:
-                unit: percent-decimal
-                decimalPlaces: 1
+              legend:
+                mode: list
+                position: bottom
+                values: []
+              visual:
+                areaOpacity: 0
+                connectNulls: false
+                display: line
+                lineWidth: 1.5
+              yAxis:
+                format:
+                  unit: percent-decimal
+                min: 0
           queries:
             - kind: TimeSeriesQuery
               spec:
@@ -588,15 +597,24 @@ spec:
             name: MaaS API error rate
             description: >-
               Share of user-facing MaaS API requests that returned a server
-              error or timed out. Health probes are excluded; a zero
-              denominator is treated as zero errors.
+              error or timed out, by cluster. Health probes are excluded; a
+              zero denominator is treated as zero errors.
           plugin:
-            kind: StatChart
+            kind: TimeSeriesChart
             spec:
-              calculation: last-number
-              format:
-                unit: percent-decimal
-                decimalPlaces: 1
+              legend:
+                mode: list
+                position: bottom
+                values: []
+              visual:
+                areaOpacity: 0
+                connectNulls: false
+                display: line
+                lineWidth: 1.5
+              yAxis:
+                format:
+                  unit: percent-decimal
+                min: 0
           queries:
             - kind: TimeSeriesQuery
               spec:
@@ -616,14 +634,24 @@ spec:
             name: MaaS DB replication lag
             description: >-
               Replica lag as a share of the MaaS API's exported critical
-              threshold. At or above 100%, reads avoid the lagging replica.
+              threshold, by cluster. At or above 100%, reads avoid the lagging
+              replica.
           plugin:
-            kind: StatChart
+            kind: TimeSeriesChart
             spec:
-              calculation: last-number
-              format:
-                unit: percent-decimal
-                decimalPlaces: 1
+              legend:
+                mode: list
+                position: bottom
+                values: []
+              visual:
+                areaOpacity: 0
+                connectNulls: false
+                display: line
+                lineWidth: 1.5
+              yAxis:
+                format:
+                  unit: percent-decimal
+                min: 0
           queries:
             - kind: TimeSeriesQuery
               spec:
@@ -643,14 +671,24 @@ spec:
             name: MaaS DB read fallbacks
             description: >-
               Reads per second that the MaaS API served from the primary
-              instead of a replica. A sustained non-zero rate is unhealthy.
+              instead of a replica, by cluster. A sustained non-zero rate is
+              unhealthy.
           plugin:
-            kind: StatChart
+            kind: TimeSeriesChart
             spec:
-              calculation: last-number
-              format:
-                unit: decimal
-                decimalPlaces: 2
+              legend:
+                mode: list
+                position: bottom
+                values: []
+              visual:
+                areaOpacity: 0
+                connectNulls: false
+                display: line
+                lineWidth: 1.5
+              yAxis:
+                format:
+                  unit: decimal
+                min: 0
           queries:
             - kind: TimeSeriesQuery
               spec:
@@ -670,8 +708,8 @@ spec:
             name: MaaS API P90 request latency
             description: >-
               P90 latency over the last hour for user-facing MaaS API requests,
-              before model inference. Health probes are excluded so they cannot
-              mask slower tenant operations.
+              by cluster, before model inference. Health probes are excluded so
+              they cannot mask slower tenant operations.
           plugin:
             kind: TimeSeriesChart
             spec:
@@ -706,8 +744,8 @@ spec:
           display:
             name: MaaS controller reconciliation errors
             description: >-
-              Reconciliation error rate for the MaaS and AI gateway
-              controllers. Terminal errors no longer retry and need attention.
+              Reconciliation error rate for the MaaS and AI gateway controllers,
+              by cluster. Terminal errors no longer retry and need attention.
           plugin:
             kind: TimeSeriesChart
             spec:
@@ -753,8 +791,8 @@ spec:
           display:
             name: MaaS request rejections
             description: >-
-              Requests per second rejected before model inference, grouped by
-              reason. Guardrail-unavailable and no-capacity indicate service
+              Requests per second rejected before model inference, by cluster
+              and reason. Guardrail-unavailable and no-capacity indicate service
               health problems; the other reasons are tenant or policy limits.
           plugin:
             kind: TimeSeriesChart
@@ -858,46 +896,46 @@ spec:
           items:
             - x: 0
               'y': 0
-              width: 6
-              height: 4
+              width: 12
+              height: 8
               content:
                 '$ref': '#/spec/panels/maasApiAvailability'
-            - x: 6
-              'y': 0
-              width: 6
-              height: 4
-              content:
-                '$ref': '#/spec/panels/maasApiErrorRate'
             - x: 12
               'y': 0
-              width: 6
-              height: 4
+              width: 12
+              height: 8
+              content:
+                '$ref': '#/spec/panels/maasApiErrorRate'
+            - x: 0
+              'y': 8
+              width: 12
+              height: 8
               content:
                 '$ref': '#/spec/panels/maasDatabaseLagHealth'
-            - x: 18
-              'y': 0
-              width: 6
-              height: 4
+            - x: 12
+              'y': 8
+              width: 12
+              height: 8
               content:
                 '$ref': '#/spec/panels/maasDatabaseReadFallbacks'
             - x: 0
-              'y': 4
+              'y': 16
               width: 12
               height: 8
               content:
                 '$ref': '#/spec/panels/maasApiRequestLatency'
             - x: 12
-              'y': 4
+              'y': 16
               width: 12
               height: 8
               content:
-                '$ref': '#/spec/panels/maasControllerReconcileErrors'
+                '$ref': '#/spec/panels/maasRequestRejections'
             - x: 0
-              'y': 12
+              'y': 24
               width: 24
               height: 8
               content:
-                '$ref': '#/spec/panels/maasRequestRejections'
+                '$ref': '#/spec/panels/maasControllerReconcileErrors'
       # Cluster-wide usage section
       - kind: Grid
         spec:
