@@ -175,6 +175,48 @@ def apply_settings(admin, realm):
     print("realm settings applied: %s" % ", ".join(sorted(settings)))
 
 
+def sync_authentication_flows(admin, realm):
+    """Reconcile declared flat custom flows without resetting the populated realm."""
+    wanted_flows = realm.get("authenticationFlows", [])
+    if not wanted_flows:
+        return
+    live_flows = {flow["alias"]: flow for flow in admin.call("GET", "/authentication/flows")}
+    for wanted in wanted_flows:
+        alias = wanted["alias"]
+        executions = wanted.get("authenticationExecutions", [])
+        if wanted.get("builtIn") or not wanted.get("topLevel") or any(
+            execution.get("authenticatorFlow") or not execution.get("authenticator")
+            for execution in executions
+        ):
+            raise Failure("authentication flow %s: only flat custom top-level flows are supported" % alias)
+        if alias not in live_flows:
+            definition = {key: value for key, value in wanted.items() if key != "authenticationExecutions"}
+            admin.call("POST", "/authentication/flows", definition)
+        elif live_flows[alias].get("builtIn") or not live_flows[alias].get("topLevel"):
+            raise Failure("authentication flow %s conflicts with an existing non-custom flow" % alias)
+        path = "/authentication/flows/%s/executions" % quote(alias)
+        live = admin.call("GET", path)
+        expected = [execution["authenticator"] for execution in executions]
+        providers = [execution.get("providerId") for execution in live]
+        if len(set(expected)) != len(expected) or len(set(providers)) != len(providers) or any(
+            provider not in expected for provider in providers
+        ):
+            raise Failure("authentication flow %s has unexpected or duplicate executions" % alias)
+        for execution in executions:
+            provider = execution["authenticator"]
+            if provider not in providers:
+                admin.call("POST", path + "/execution", {"provider": provider})
+        live = admin.call("GET", path)
+        for execution in executions:
+            matches = [item for item in live if item.get("providerId") == execution["authenticator"]]
+            if len(matches) != 1:
+                raise Failure("authentication flow %s: execution %s not found uniquely" % (alias, execution["authenticator"]))
+            current = matches[0]
+            if current.get("requirement") != execution["requirement"]:
+                admin.call("PUT", path, dict(current, requirement=execution["requirement"]))
+        print("authentication flow %s applied" % alias)
+
+
 def add_missing(admin, realm):
     body = {key: realm[key] for key in PARTIAL_IMPORT_KEYS if key in realm}
     body["ifResourceExists"] = "SKIP"
@@ -344,6 +386,7 @@ def sync(path):
                       % (SYNC_CLIENT, status, message))
     admin = Admin(access_token)
     apply_settings(admin, realm)
+    sync_authentication_flows(admin, realm)
     add_missing(admin, realm)
     # The keycloak-redirect-uris CronJob sets this client's redirect URIs.
     update_clients(admin, realm, redirect_uris_owned_elsewhere=os.environ["KEYCLOAK_CLIENT_ID"])

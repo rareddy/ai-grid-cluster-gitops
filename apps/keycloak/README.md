@@ -348,3 +348,5 @@ responsibility of that shared database app.
 
 The stable realm signing keys depend on the cluster-wide cert-manager
 installation.
+
+The realm sync also creates declared flat custom authentication flows in an existing realm before applying IdPs. It preserves users, organizations and provider links, completes a partially created flow on retry, and rejects unexpected executions instead of deleting them. Run `python3 apps/keycloak/tests/authentication-flow-sync-test.py` for the offline reconciliation check.
