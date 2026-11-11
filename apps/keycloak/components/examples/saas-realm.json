@@ -6,6 +6,23 @@
   "enabled": true,
   "loginWithEmailAllowed": true,
   "organizationsEnabled": true,
+  "authenticationFlows": [
+    {
+      "alias": "ai-grid-first-broker-login",
+      "description": "Create a unique local account for each brokered identity.",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "idp-create-user-if-unique",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "authenticatorFlow": false
+        }
+      ]
+    }
+  ],
   "clients": [
     {
       "clientId": "${KEYCLOAK_CLIENT_ID}",
@@ -29,6 +46,19 @@
       ],
       "optionalClientScopes": ["organization"],
       "protocolMappers": [
+        {
+          "name": "AI Grid preferred username",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "maas_preferred_username",
+            "claim.name": "preferred_username",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        },
         {
           "name": "MaaS tenant groups",
           "protocol": "openid-connect",
@@ -179,6 +209,7 @@
       "enabled": true,
       "trustEmail": true,
       "hideOnLogin": true,
+      "firstBrokerLoginFlowAlias": "ai-grid-first-broker-login",
       "config": {
         "clientId": "saas-broker",
         "clientSecret": "${GRID_TENANT_1_BROKER_CLIENT_SECRET}",
@@ -201,6 +232,7 @@
       "enabled": true,
       "trustEmail": true,
       "hideOnLogin": true,
+      "firstBrokerLoginFlowAlias": "ai-grid-first-broker-login",
       "config": {
         "clientId": "saas-broker",
         "clientSecret": "${GRID_TENANT_2_BROKER_CLIENT_SECRET}",
@@ -259,6 +291,26 @@
       }
     },
     {
+      "name": "AI Grid local username",
+      "identityProviderAlias": "grid-tenant-1",
+      "identityProviderMapper": "oidc-username-idp-mapper",
+      "config": {
+        "template": "${UUID}",
+        "target": "LOCAL",
+        "syncMode": "IMPORT"
+      }
+    },
+    {
+      "name": "AI Grid preferred username",
+      "identityProviderAlias": "grid-tenant-1",
+      "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+      "config": {
+        "claim": "preferred_username",
+        "user.attribute": "maas_preferred_username",
+        "syncMode": "FORCE"
+      }
+    },
+    {
       "name": "Grid Tenant 2 groups",
       "identityProviderAlias": "grid-tenant-2",
       "identityProviderMapper": "oidc-user-attribute-idp-mapper",
@@ -297,6 +349,26 @@
         "user.attribute": "maas_roles",
         "syncMode": "FORCE"
       }
+    },
+    {
+      "name": "AI Grid local username",
+      "identityProviderAlias": "grid-tenant-2",
+      "identityProviderMapper": "oidc-username-idp-mapper",
+      "config": {
+        "template": "${UUID}",
+        "target": "LOCAL",
+        "syncMode": "IMPORT"
+      }
+    },
+    {
+      "name": "AI Grid preferred username",
+      "identityProviderAlias": "grid-tenant-2",
+      "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+      "config": {
+        "claim": "preferred_username",
+        "user.attribute": "maas_preferred_username",
+        "syncMode": "FORCE"
+      }
     }
   ],
   "components": {
@@ -328,7 +400,7 @@
         "subComponents": {},
         "config": {
           "config-pieces-count": ["1"],
-          "config-piece-0": ["{\"unmanagedAttributePolicy\":\"ADMIN_EDIT\"}"]
+          "config-piece-0": ["{\"unmanagedAttributePolicy\":\"ADMIN_EDIT\",\"attributes\":[{\"name\":\"username\",\"required\":{},\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]}}]}"]
         }
       }
     ]

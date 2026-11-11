@@ -264,6 +264,27 @@ No claim value is a user attribute. `saas`'s identity provider mappers copy the
 two claims on every sign-in (sync mode Force), so a change takes effect at the
 user's next sign-in.
 
+Each example tenant's `saas-broker` client links the standard `profile` and
+`email` client scopes. The broker's upstream authorization request therefore
+accepts `openid profile email`.
+
+The `saas` broker stores each imported user under a generated local username.
+That local username is only a storage handle; the user's stable identity is the
+broker subject. The upstream `preferred_username` is copied into
+`maas_preferred_username` and then emitted as `preferred_username` by the
+`tenant-demo` client mapper. The first broker login flow
+`ai-grid-first-broker-login` creates a unique local account and does not link
+an existing account by email. A matching email therefore stops the login
+instead of silently linking two different people.
+
+`grid-tenant-2-idp` contains `alice`, `bob`, and `carol`. Alice in
+`grid-tenant-1-idp` and Alice in `grid-tenant-2-idp` use the same external
+username but remain two different broker subjects. Bob is the only member of
+group `ai-grid-bob`; the tenant-2 MaaS subscription and auth policy select that
+qualified group, not Bob's literal username. This keeps Bob's access when the
+local username changes. See the shared identity design in
+`docs/superpowers/specs/2026-11-09-rhai-22299-identity-isolation-design.md`.
+
 | Realm | User | Groups | Roles | Administers the realm |
 | --- | --- | --- | --- | --- |
 | `grid-tenant-1-idp` | `alice` | `ai-grid-admins`, `ai-grid-users` | `admins` | yes |
@@ -315,7 +336,11 @@ kubectl logs job/keycloak-saas-realm-sync -n maas-db
 ```
 
 Offline checks: `apps/keycloak/tests/realm-import-test.sh` and
-`apps/keycloak/tests/redirect-uris-test.sh`.
+`apps/keycloak/tests/redirect-uris-test.sh`. Also run:
+
+```sh
+uv run --with pyyaml python apps/keycloak/tests/identity-contract-test.py
+```
 
 The Keycloak database inherits the availability and storage characteristics of
 the existing `maas-db` CloudNativePG cluster. Database backups remain the

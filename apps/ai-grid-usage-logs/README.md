@@ -9,7 +9,7 @@ It renders no store, and keeps no copy of the store's settings.
 
 | Owned by `apps/ai-grid-o11y` | Where |
 |---|---|
-| the LokiStack — name, size, storage class, schemas, 30-day retention, the seven promoted stream labels | `manifests/lokistack.yaml` |
+| the LokiStack — name, size, storage class, schemas, 30-day retention, the promoted stream labels | `manifests/lokistack.yaml` |
 | the bucket | `manifests/obc-usage-logs-bucket.yaml` |
 | the S3 Secret it is translated into | `manifests/job-provision-loki-key.yaml` + `manifests/rbac-provision-loki-key.yaml` |
 | the writer identity | `manifests/sa-usage-logs-writer.yaml`, `clusterrole-…`, `clusterrolebinding-…` |
@@ -128,4 +128,10 @@ A TLS failure without `--cacert` that succeeds with it means the spoke consumer
 is not appending the delivered CA to its system trust pool.
 
 A record pushed at a site collector's receiver should arrive in the hub store
-with `cluster_name`, `model` and `service_name` promoted as stream labels.
+with `cluster_name`, `model`, `service_name`, `organization_id`, and `user_id`
+promoted as stream labels. `user_id` is the URL-safe Base64 encoding of the
+JSON array `[identity_source, identity_issuer, subject]`.
+
+Historical streams keep the labels they had when they were written. Organization
+admins retain the existing scoped historical view. The identity labels start
+only after the updated MaaS collectors are deployed.

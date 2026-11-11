@@ -74,6 +74,30 @@ fail unless inference uses a given model.
 
 ## What the test verifies
 
+The smoke test compares identity by issuer and subject, not by username. The
+broker's local username is only a storage handle and may differ from the
+upstream `preferred_username`. The example tenant-2 policy grants Bob's
+subscription through group `ai-grid-bob`, so Bob's access does not depend on
+the literal username `bob`.
+
+Set `BROKER_HINT` and `PASSWORD_SECRET_KEY` to select either example identity
+provider while keeping the external username `alice`. Set `IDENTITY_ONLY=1` to
+stop after the token exchange, `/v1/me`, and `/v1/subscriptions`. This mode
+does not create API keys, call inference, or run the rate-limit probe. Set
+`IDENTITY_RESULT_FILE` to write issuer, subject, organization, profile, and
+bounded subscription metadata. The file is created with mode `0600` and never
+contains tokens, passwords, client secrets, or API keys.
+
+Use `scripts/identity-isolation-smoke.sh` to compare two companies that both
+use the external username `alice`. Set `IDP_A`, `IDP_B`, `ORG_A`, `ORG_B`,
+`PASSWORD_SECRET_KEY_A`, and `PASSWORD_SECRET_KEY_B`. The wrapper authenticates
+A, B, A, and B, requires distinct cross-company subjects, requires stable
+subjects on repeat, and checks the expected organization boundaries. Matching
+emails must fail rather than link the two company accounts.
+
+Run the wrapper only in an authorized environment. Contributors run its input
+checks and shell syntax checks; they do not run the live browserless login.
+
 The script:
 
 1. Discovers the Keycloak and MaaS Gateway endpoints from cluster resources.

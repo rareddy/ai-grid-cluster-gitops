@@ -22,6 +22,10 @@
       "attributes": {
         "post.logout.redirect.uris": "${KEYCLOAK_PUBLIC_URL}/realms/saas/broker/grid-tenant-1/endpoint/logout_response"
       },
+      "defaultClientScopes": [
+        "profile",
+        "email"
+      ],
       "protocolMappers": [
         {
           "name": "MaaS tenant groups",

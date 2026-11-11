@@ -13,6 +13,14 @@ Environment overrides:
                          Gateway. Defaults to the current context.
   REDIRECT_URI           Redirect URI registered for the OIDC client. Defaults to
                          KEYCLOAK_REDIRECT_URI from the Keycloak secret.
+  BROKER_HINT            Identity provider alias. Defaults to the selected
+                         user's example provider.
+  PASSWORD_SECRET_KEY    Secret key that holds the user's password. Defaults to
+                         the selected user's example key.
+  IDENTITY_ONLY          Set to 1 to stop after the token, /v1/me, and
+                         subscription reads. Defaults to 0.
+  IDENTITY_RESULT_FILE   Optional identity-only result path. The file is created
+                         with mode 0600.
   ASSUME_YES             Set to 1 to proceed without the inference and
                          rate-limit approval prompts.
   GATEWAY_HOST          MaaS Gateway hostname used for the HTTP Host header.
@@ -124,6 +132,15 @@ case "$user" in
     exit 2
     ;;
 esac
+
+broker_hint="${BROKER_HINT:-$broker_hint}"
+password_key="${PASSWORD_SECRET_KEY:-$password_key}"
+identity_only="${IDENTITY_ONLY:-0}"
+identity_result_file="${IDENTITY_RESULT_FILE:-}"
+[[ "$identity_only" == 0 || "$identity_only" == 1 ]] || fail "IDENTITY_ONLY must be 0 or 1"
+if (( identity_only )); then
+  require_inference=0
+fi
 
 require_inference="${REQUIRE_INFERENCE:-${default_require_inference:-1}}"
 [[ "$require_inference" == 0 || "$require_inference" == 1 ]] || fail "REQUIRE_INFERENCE must be 0 or 1"
@@ -441,6 +458,38 @@ else
     printf '    roles: %s\n' "$roles"
     printf '    models: %s\n' "$models"
   done < <(jq -r '.[] | [.subscription_id_header, (.roles // [] | join(", ")), (.organization_id // ""), (.model_refs // [] | map(.name) | join(", "))] | @tsv' "$subscriptions_response")
+fi
+
+if [[ "$identity_only" == 1 ]]; then
+  if [[ -n "$identity_result_file" ]]; then
+    organizations_json=$(jq '[."https://redhat.com/maas/orgs"[]? | {organization_id, roles}]' "$claims")
+    profile_json=$(jq '{name, preferred_username}' "$me_response")
+    subscriptions_json=$(jq '[.[] | {subscription_id: .subscription_id_header, organization_id, roles, model_names: [.model_refs[]?.name]}]' "$subscriptions_response")
+    identity_result_json=$(jq -n \
+      --arg issuer "$(jq -r '.iss' "$claims")" \
+      --arg subject "$(jq -r '.sub' "$claims")" \
+      --argjson organizations "$organizations_json" \
+      --argjson profile "$profile_json" \
+      --argjson subscriptions "$subscriptions_json" \
+      '{
+        issuer: $issuer,
+        subject: $subject,
+        organizations: $organizations,
+        profile: $profile,
+        subscriptions: $subscriptions
+      }')
+    (
+      umask 077
+      printf '%s\n' "$identity_result_json" > "$identity_result_file"
+    )
+    chmod 600 "$identity_result_file"
+  fi
+  print_section "Identity-only result"
+  printf '  mode: identity-only\n'
+  if [[ -n "$identity_result_file" ]]; then
+    printf '  result file: %s\n' "$identity_result_file"
+  fi
+  exit 0
 fi
 
 api_key_id=""
