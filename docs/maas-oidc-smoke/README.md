@@ -62,7 +62,7 @@ docs/maas-oidc-smoke/scripts/maas-oidc-smoke.sh --help
 The rate-limit test uses the selected subscription's smallest finite token
 rate limit. It sizes a generated prompt from the tokens already reported by
 the successful inference request, exhausts the remaining quota, and expects a
-follow-up completion to return HTTP `429`. Because token usage is reported
+follow-up chat completion to return HTTP `429`. Because token usage is reported
 after a response, the probe retries up to `RATE_LIMIT_PROBE_ATTEMPTS` times.
 The test is skipped when the dynamically sized prompt would exceed
 `RATE_LIMIT_MAX_PROMPT_TOKENS`, avoiding an unsafe request payload.
@@ -85,7 +85,7 @@ The script:
    subscription.
 7. Calls `/v1/api-keys/search` and verifies that a newly created key is listed.
 8. Calls `/v1/models` with the ephemeral API key when one was created.
-9. Asks for approval, then sends an OpenAI-compatible completion request.
+9. Asks for approval, then sends an OpenAI-compatible chat completion request.
 10. Asks for approval, then exhausts and verifies the selected subscription's
    finite token rate limit when it is small enough to test safely.
 

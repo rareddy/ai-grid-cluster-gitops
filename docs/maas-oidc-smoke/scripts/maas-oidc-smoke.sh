@@ -579,7 +579,7 @@ inference_failed=0
 inference_succeeded=0
 
 if [[ -z "$api_key_id" ]]; then
-  print_section "POST /v1/completions"
+  print_section "POST /v1/chat/completions"
   skip_stage inference 'no owner-accessible API key was provisioned'
 else
   inference_model_ref=$(
@@ -592,11 +592,11 @@ else
     fail "inference would use model $inference_model, not EXPECT_MODEL $expect_model"
   fi
   if [[ -z "$inference_model" ]]; then
-    print_section "POST /v1/completions"
+    print_section "POST /v1/chat/completions"
     skip_stage inference 'no model is available through the subscription'
   else
     confirm_action "Send one completion request to the MaaS Gateway using the newly created ephemeral API key.
-Endpoint: /v1/completions
+Endpoint: /v1/chat/completions
 Model: $inference_model
 Prompt: $inference_prompt" || fail "inference request was not approved"
 
@@ -606,7 +606,7 @@ Prompt: $inference_prompt" || fail "inference request was not approved"
       --argjson max_tokens "$inference_max_tokens" \
       '{
         model: $model,
-        prompt: $prompt,
+        messages: [{role: "user", content: $prompt}],
         max_tokens: $max_tokens
       }')
 
@@ -617,17 +617,17 @@ Prompt: $inference_prompt" || fail "inference request was not approved"
         -H 'Content-Type: application/json' \
         -d "$completions_request" \
         -o "$completions_response" -w '%{http_code}' \
-        "$base_url/v1/completions" || true
+        "$base_url/v1/chat/completions" || true
     )
 
-    print_section "POST /v1/completions"
+    print_section "POST /v1/chat/completions"
     printf '  HTTP status: %s\n' "$completions_status"
     if [[ "$completions_status" != 2* ]] || ! jq -e 'has("choices") and (.choices | length > 0)' "$completions_response" >/dev/null; then
       jq . "$completions_response" >&2 || true
       inference_failed=1
     else
       printf '  model: %s\n' "$(jq -r '.model' "$completions_response")"
-      printf '  response: %s\n' "$(jq -r '.choices[0].text' "$completions_response")"
+      printf '  response: %s\n' "$(jq -r '.choices[0].message.content' "$completions_response")"
       printf '  finish reason: %s\n' "$(jq -r '.choices[0].finish_reason' "$completions_response")"
       printf '  prompt tokens: %s\n' "$(jq -r '.usage.prompt_tokens' "$completions_response")"
       printf '  completion tokens: %s\n' "$(jq -r '.usage.completion_tokens' "$completions_response")"
@@ -670,7 +670,7 @@ else
       skip_stage rate-limit "the ${rate_limit_prompt_tokens}-token exhaustion prompt exceeds RATE_LIMIT_MAX_PROMPT_TOKENS (${rate_limit_max_prompt_tokens})"
     else
       confirm_action "Send additional completion requests to exhaust and verify the subscription token rate limit.
-Endpoint: /v1/completions
+Endpoint: /v1/chat/completions
 Model: $inference_model
 Configured limit: $rate_limit_limit tokens per $rate_limit_window
 The first request uses a dynamically sized prompt; up to $rate_limit_probe_attempts
@@ -684,7 +684,7 @@ subsequent probes expect HTTP 429." ||
         --arg prompt "$rate_limit_prompt" \
         '{
           model: $model,
-          prompt: $prompt,
+          messages: [{role: "user", content: $prompt}],
           max_tokens: 1
         }')
 
@@ -695,7 +695,7 @@ subsequent probes expect HTTP 429." ||
           -H 'Content-Type: application/json' \
           -d "$rate_limit_exhaust_request" \
           -o "$rate_limit_exhaust_response" -w '%{http_code}' \
-          "$base_url/v1/completions" || true
+          "$base_url/v1/chat/completions" || true
       )
 
       print_section "Token rate limit"
@@ -724,7 +724,7 @@ subsequent probes expect HTTP 429." ||
             --arg prompt "Reply with: rate-limit probe." \
             '{
               model: $model,
-              prompt: $prompt,
+              messages: [{role: "user", content: $prompt}],
               max_tokens: 1
             }')
 
@@ -735,7 +735,7 @@ subsequent probes expect HTTP 429." ||
               -H 'Content-Type: application/json' \
               -d "$rate_limit_probe_request" \
               -o "$rate_limit_probe_response" -w '%{http_code}' \
-              "$base_url/v1/completions" || true
+              "$base_url/v1/chat/completions" || true
           )
 
           printf '  probe %s HTTP status: %s\n' "$probe_attempt" "$rate_limit_probe_status"
