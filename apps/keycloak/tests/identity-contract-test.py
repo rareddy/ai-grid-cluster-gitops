@@ -144,6 +144,11 @@ def check_maas_policy():
         "apps/acm-models/maas/policies/"
         "20-tenant-53d4f57e-3588-55e8-b96c-4ec54a7c42fa-maas-policies.yaml",
     )
+    # This branch intentionally removed the demo grants in favor of the catalog.
+    # Still require the fixture when its policies directory exists.
+    if not os.path.isdir(os.path.dirname(path)):
+        print("demo policy check: skipped (demo policies removed on this branch)")
+        return
     with open(path) as stream:
         documents = list(yaml.safe_load_all(stream))
     assert len(documents) == 2, documents

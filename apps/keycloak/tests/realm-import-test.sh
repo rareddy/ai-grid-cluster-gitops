@@ -32,7 +32,8 @@ check_rendered() {
   local file
   for file in "$@"; do
     python3 -m json.tool "$file" >/dev/null
-    if grep -q '\${[A-Z0-9_]*}' "$file"; then
+    # Keycloak expands this username mapper template during the first login.
+    if grep -q '\${[A-Z0-9_]*}' <(sed 's/${UUID}//g' "$file"); then
       echo "unrendered placeholder in $file" >&2
       exit 1
     fi
