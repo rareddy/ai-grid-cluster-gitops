@@ -4,14 +4,16 @@ How a cluster becomes a Grid site on v0.3.0-rc.3, under Local membership with AC
 
 ## Installing Argo CD
 
-Argo CD runs on the hub and installs everything else from the tenant repo, ACM included. Argo syncs from git, so run it from your own fork. Point the fork's Argo sources at itself, once, and push:
+Argo CD runs on the hub and installs everything else from the GitOps repo, ACM included. Argo syncs from git, so run it from your own fork. Point the fork's Argo sources at itself, once, and push:
 
 ```bash
-git clone https://github.com/<you>/ai-grid-tenant.git
-cd ai-grid-tenant
-scripts/set-tenant-repo.sh https://github.com/<you>/ai-grid-tenant.git main
+git clone https://github.com/<you>/ai-grid-cluster-gitops.git
+cd ai-grid-cluster-gitops
+scripts/set-tenant-repo.sh https://github.com/<you>/ai-grid-cluster-gitops.git main
 git commit -am "Point Argo at this fork" && git push
 ```
+
+Use your actual fork URL and replace `main` with your deployment branch.
 
 Then, as cluster-admin on the hub:
 
@@ -23,6 +25,14 @@ export RHOAI_STAGE_PULL_SECRET=<base64 of user:password for registry.stage.redha
 ```
 
 bootstrap.sh installs the openshift-gitops-operator Subscription, waits for the Argo CRDs, and applies a root ApplicationSet over apps/*/application.yaml. Argo then syncs every app from the fork.
+
+After `bootstrap.sh` completes, run this manual check. `READY` confirms registration
+prerequisites only; it does not check MultiClusterHub completion or Argo cluster
+registration. If it reports `NOT READY`, inspect the reported failure before retrying.
+
+```bash
+docs/acm/cluster-onboarding/check-hub-ready.sh --hub-context <hub-context>
+```
 
 The root ApplicationSet is the one object Argo does not sync from Git. After a change to bootstrap/applicationset.yaml, or to bootstrap/dedicated-hub/applicationset.yaml on a dedicated hub, apply it again from the revision the hub tracks:
 

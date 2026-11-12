@@ -178,6 +178,15 @@ its named Authorino volume and leaves other Deployment volumes intact.
 - Enough capacity on the target cluster for the applications that the
   ApplicationSets deploy there.
 
+## Check hub readiness
+
+ACM installation continues after bootstrap. Check registration prerequisites manually;
+`READY` does not verify MultiClusterHub completion or Argo cluster registration:
+
+```sh
+docs/acm/cluster-onboarding/check-hub-ready.sh --hub-context "$HUB_CONTEXT"
+```
+
 ## Import a cluster
 
 Set the runtime inputs in your shell. For example:
