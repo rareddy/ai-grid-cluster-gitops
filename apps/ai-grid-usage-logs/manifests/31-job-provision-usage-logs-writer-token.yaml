@@ -11,7 +11,7 @@
 #
 # Wave ordering is handled by the hook type: PostSync runs after the store's
 # own storage-key hook and every wave of this Application, so the
-# apps/ai-grid-o11y-owned ServiceAccount exists by then.
+# ServiceAccount that apps/ai-grid-o11y owns exists by then.
 apiVersion: batch/v1
 kind: Job
 metadata:
