@@ -19,6 +19,20 @@ Then, as cluster-admin on the hub:
 
 ```bash
 oc login --server=https://api.<hub-cluster-domain>:6443 -u <cluster-admin>
+```
+
+On managed OpenShift such as OSD/ROSA, precreate any missing namespaces using a
+`cluster-admins` group member. On self-managed OpenShift, ACM creates them
+automatically; skip only this block.
+
+```bash
+oc create namespace redhat-ai-grid
+oc create namespace redhat-ods-operator
+```
+
+For all installations, set the pull secrets and run bootstrap:
+
+```bash
 export RHOAI_QUAY_PULL_SECRET=<base64 of user:password for quay.io/rhoai>
 export RHOAI_STAGE_PULL_SECRET=<base64 of user:password for registry.stage.redhat.io>   # needed for model images pulled through the rhaii mirrors
 ./bootstrap.sh
