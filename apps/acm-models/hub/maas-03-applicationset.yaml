@@ -35,7 +35,7 @@ spec:
     spec:
       project: default
       source:
-        repoURL: https://github.com/rareddy/ai-grid-tenant.git
+        repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
         targetRevision: nov12
         path: apps/acm-models/maas
         directory:

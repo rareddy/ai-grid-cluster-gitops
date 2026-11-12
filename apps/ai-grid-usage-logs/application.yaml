@@ -15,14 +15,14 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: https://github.com/rareddy/ai-grid-tenant.git
+    - repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
       targetRevision: nov12
       ref: values
 
     # The Loki operator. Not in the chart: the subchart renders the LokiStack,
     # while the operator is the parent chart's dependencies.loki, and a
     # dedicated hub runs no RHOAI to bring it.
-    - repoURL: https://github.com/rareddy/ai-grid-tenant.git
+    - repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
       targetRevision: nov12
       path: apps/ai-grid-usage-logs/manifests
 

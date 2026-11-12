@@ -47,7 +47,7 @@ spec:
     spec:
       project: default
       sources:
-        - repoURL: https://github.com/rareddy/ai-grid-tenant.git
+        - repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
           targetRevision: nov12
           ref: values
         # Immutable OCI snapshot from the 3.6.0 dev channel.
@@ -113,7 +113,7 @@ spec:
                         cidr: {{ printf "invalid ai-grid/machine-network label %s" . | quote }}
                         {{- end }}
                     {{- end }}
-        - repoURL: https://github.com/rareddy/ai-grid-tenant.git
+        - repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
           targetRevision: nov12
           path: apps/rhoai/gateway-hostname
           helm:
@@ -132,7 +132,7 @@ spec:
               - name: role
                 value: '{{ index .metadata.labels "ai-grid/role" }}'
                 forceString: true
-        - repoURL: https://github.com/rareddy/ai-grid-tenant.git
+        - repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
           targetRevision: nov12
           path: apps/rhoai/catalog
           helm:

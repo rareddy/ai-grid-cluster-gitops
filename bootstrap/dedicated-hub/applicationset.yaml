@@ -19,7 +19,7 @@ spec:
   generators:
     # ACM and argo-registration must start before a cluster Secret exists.
     - git:
-        repoURL: https://github.com/rareddy/ai-grid-tenant.git
+        repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
         revision: nov12
         files:
           - path: apps/acm/application.yaml
@@ -50,7 +50,7 @@ spec:
     - matrix:
         generators:
           - git:
-              repoURL: https://github.com/rareddy/ai-grid-tenant.git
+              repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
               revision: nov12
               files:
                 - path: apps/odf/application.yaml

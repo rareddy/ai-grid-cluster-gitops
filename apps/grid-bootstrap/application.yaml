@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: https://github.com/rareddy/ai-grid-tenant.git
+    - repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
       targetRevision: nov12
       ref: values
     - repoURL: https://github.com/opendatahub-io/odh-gitops.git
@@ -16,7 +16,7 @@ spec:
         releaseName: grid-bootstrap
         valueFiles:
           - $values/apps/grid-bootstrap/values.yaml
-    - repoURL: https://github.com/rareddy/ai-grid-tenant.git
+    - repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
       targetRevision: nov12
       path: apps/grid-bootstrap/policies
   destination:

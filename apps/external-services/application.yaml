@@ -9,7 +9,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/rareddy/ai-grid-tenant.git
+    repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
     targetRevision: nov12
     path: apps/external-services/hub
   # maas-db, created untracked, holds the rhoai app's tenant RBAC Role; this

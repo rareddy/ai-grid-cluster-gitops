@@ -51,7 +51,7 @@ spec:
     spec:
       project: default
       source:
-        repoURL: https://github.com/rareddy/ai-grid-tenant.git
+        repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
         targetRevision: nov12
         path: '{{ if eq (index .metadata.labels "local-cluster") "true" }}apps/maas-db/primary{{ else }}apps/maas-db/read-clusters{{ end }}'
       destination:
