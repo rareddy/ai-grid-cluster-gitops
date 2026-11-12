@@ -34,6 +34,10 @@ registration. If it reports `NOT READY`, inspect the reported failure before ret
 docs/acm/cluster-onboarding/check-hub-ready.sh --hub-context <hub-context>
 ```
 
+Both profiles wait for the hub's Argo cluster registration and its
+`openshiftVersion-major-minor` label before generating ODF, so its operator
+channel matches the hub. ACM and cluster registration start independently.
+
 The root ApplicationSet is the one object Argo does not sync from Git. After a change to bootstrap/applicationset.yaml, or to bootstrap/dedicated-hub/applicationset.yaml on a dedicated hub, apply it again from the revision the hub tracks:
 
 ```bash

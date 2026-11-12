@@ -46,7 +46,7 @@ spec:
           # the writer token. apps/odf, its object storage, is listed below.
           - path: apps/ai-grid-usage-logs/application.yaml
     # Only ODF needs cluster metadata. Wait for ACM registration and its
-    # version label rather than falling back to the chart's default channel.
+    # version label: the operator channel must match the hub's OpenShift version.
     - matrix:
         generators:
           - git:
