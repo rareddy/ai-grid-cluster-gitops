@@ -39,8 +39,8 @@ spec:
     - matrix:
         generators:
           - git:
-              repoURL: https://github.com/ai-grid-cloud/ai-grid-cluster-gitops.git
-              revision: HEAD
+              repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
+              revision: nov12
               files:
                 - path: apps/odf/application.yaml
           - clusters:
