@@ -4,7 +4,11 @@ metadata:
   generateName: provision-loki-s3-secret-
   namespace: redhat-ods-monitoring
   annotations:
-    argocd.argoproj.io/hook: PostSync
+    # The LokiStack (wave 2) reports Degraded without this Secret, and a
+    # Degraded resource fails the sync, so a PostSync hook would never run.
+    # Wave 1 runs after the bucket claim (wave 0) is Bound.
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "1"
     argocd.argoproj.io/hook-delete-policy: HookSucceeded
 spec:
   template:

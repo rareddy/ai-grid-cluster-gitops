@@ -3,6 +3,9 @@ kind: LokiStack
 metadata:
   name: usage-logs
   namespace: redhat-ods-monitoring
+  annotations:
+    # After job-provision-loki-key (wave 1) creates its object storage Secret.
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   size: 1x.demo
   limits:
