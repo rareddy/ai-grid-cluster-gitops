@@ -17,7 +17,7 @@ spec:
   # to the OCM-managed `cluster-admins` Group; this adds the Git-managed
   # `ai-grid-admins` Group without touching `policy.default`.
   rbac:
-    policy.csv: |
+    policy: |
       g, ai-grid-admins, role:admin
   # Statusless declarative resources such as ACM PlacementBinding and MetalLB
   # address pools rely on Argo's sync state; scripts/check-gitops-health-checks.sh
