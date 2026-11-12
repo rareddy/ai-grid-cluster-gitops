@@ -1,5 +1,6 @@
 # This deployment's cluster admins. Overrides cluster_admins in values.yaml.
 cluster_admins:
+  - rareddy
   - khowell
   - aballant
   - lphiri
