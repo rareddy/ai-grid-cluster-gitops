@@ -42,7 +42,7 @@ spec:
                         apps.open-cluster-management.io/acm-cluster: "true"
                         name: '{{ .clusterName }}'
           - git:
-              repoURL: https://github.com/ai-grid-cloud/ai-grid-shared-catalog.git
+              repoURL: https://github.com/rareddy/ai-grid-catalog.git
               revision: main
               directories:
                 - path: 'catalog/clusters/{{.name}}'
@@ -53,7 +53,7 @@ spec:
     spec:
       project: acm-models-catalog-models
       source:
-        repoURL: https://github.com/ai-grid-cloud/ai-grid-shared-catalog.git
+        repoURL: https://github.com/rareddy/ai-grid-catalog.git
         targetRevision: main
         path: '{{.path.path}}'
         kustomize: {}
@@ -115,7 +115,7 @@ spec:
                         apps.open-cluster-management.io/acm-cluster: "true"
                         name: '{{ .clusterName }}'
           - git:
-              repoURL: https://github.com/ai-grid-cloud/ai-grid-shared-catalog.git
+              repoURL: https://github.com/rareddy/ai-grid-catalog.git
               revision: main
               directories:
                 - path: 'catalog/ingress'
@@ -130,7 +130,7 @@ spec:
     spec:
       project: acm-models-catalog-maas
       source:
-        repoURL: https://github.com/ai-grid-cloud/ai-grid-shared-catalog.git
+        repoURL: https://github.com/rareddy/ai-grid-catalog.git
         targetRevision: main
         path: '{{.path.path}}'
         kustomize: {}
@@ -191,7 +191,7 @@ spec:
                         apps.open-cluster-management.io/acm-cluster: "true"
                         name: '{{ .clusterName }}'
           - git:
-              repoURL: https://github.com/ai-grid-cloud/ai-grid-shared-catalog.git
+              repoURL: https://github.com/rareddy/ai-grid-catalog.git
               revision: main
               directories:
                 - path: 'catalog/subscriptions'
@@ -206,7 +206,7 @@ spec:
     spec:
       project: acm-models-catalog-maas
       source:
-        repoURL: https://github.com/ai-grid-cloud/ai-grid-shared-catalog.git
+        repoURL: https://github.com/rareddy/ai-grid-catalog.git
         targetRevision: main
         path: '{{.path.path}}'
         directory:
