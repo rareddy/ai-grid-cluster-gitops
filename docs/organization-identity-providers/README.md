@@ -29,9 +29,13 @@ The token that MaaS reads follows [ODH-ADR-MS-0007](https://github.com/opendatah
 | `roles` | `admins` for the organization's admins | Admin features in the MaaS portal. |
 | `preferred_username` | The user's display label, for example `alice` | Shows a readable name in MaaS. This claim is optional. |
 
-AI Grid's mappers in Keycloak add `org_id` and `org_name` for the organization: the identity provider doesn't send them. The `tenant-demo` client emits `preferred_username` again for MaaS.
+Keycloak adds `org_id` and `org_name` for the organization. The identity
+provider does not send these claims. At each sign-in, Keycloak copies `groups`,
+`roles`, and `preferred_username` from the identity provider. The built-in
+`profile` scope reads `maas_preferred_username` for `preferred_username`.
 
-Keycloak copies `groups`, `roles`, and `preferred_username` at every sign-in through the identity provider. A change at the identity provider takes effect at the user's next sign-in. A session that's already open, and its token refreshes, keeps the old values until then.
+Changes at the identity provider take effect at the user's next sign-in. An
+open session and its token refreshes keep the old values until then.
 
 **Verified email.** The MaaS portal refuses a user whose email isn't verified. Keycloak trusts the identity provider's email:
 
@@ -123,7 +127,12 @@ The identity provider's settings can't be changed in the console afterwards, and
 
 ### 5. Sign in
 
-Open the MaaS portal on an ingress cluster, `https://maas.<cluster-apps-domain>/maas-portal`, and enter an email with one of the organization's domains (1): Keycloak sends the user straight to the identity provider. At the first sign-in, a user whose email domain is one of the organization's domains joins the organization as a managed member.
+Open the MaaS portal on an ingress cluster at
+`https://maas.<cluster-apps-domain>/maas-portal`. Enter an email with one of the
+organization's domains (1). Keycloak sends the user to its identity provider.
+At the first sign-in, Keycloak's built-in first broker login flow adds the new
+user to the linked organization when the domain and membership settings allow
+it.
 
 ![Keycloak's sign-in page asking for Username or email, the field marked 1](images/10-keycloak-login-email.png)
 

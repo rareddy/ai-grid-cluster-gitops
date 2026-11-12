@@ -11,7 +11,7 @@ import yaml
 APP = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 ROOT = os.path.normpath(os.path.join(APP, "../.."))
 OVERLAYS = ("core", "default", "direct")
-FLOW_ALIAS = "ai-grid-first-broker-login"
+FIRST_BROKER_LOGIN_FLOW = "first broker login"
 LOCAL_MAPPER = "AI Grid local username"
 PREFERRED_USERNAME_MAPPER = "AI Grid preferred username"
 ORG_2 = "53d4f57e-3588-55e8-b96c-4ec54a7c42fa"
@@ -45,13 +45,21 @@ def tenant_realm(documents, name):
 
 
 def check_flow(realm):
-    flows = [flow for flow in realm.get("authenticationFlows", []) if flow["alias"] == FLOW_ALIAS]
-    assert len(flows) == 1, FLOW_ALIAS
-    executions = flows[0].get("authenticationExecutions", [])
-    assert executions, FLOW_ALIAS
-    assert all(execution.get("requirement") == "REQUIRED" for execution in executions), executions
-    assert all("Handle Existing Account" not in execution.get("authenticator", "") for execution in executions)
-    assert all("Confirm Link Existing Account" not in execution.get("authenticator", "") for execution in executions)
+    assert "authenticationFlows" not in realm
+
+
+def check_realm_sync_jobs(documents, overlay):
+    names = {"keycloak-realm-sync-bootstrap", "keycloak-saas-realm-sync"}
+    jobs = [document for document in documents
+            if document.get("kind") == "Job" and document["metadata"]["name"] in names]
+    if overlay == "direct":
+        assert not jobs, jobs
+        return
+    assert {job["metadata"]["name"] for job in jobs} == names, jobs
+    assert all(
+        job["metadata"]["labels"]["app.kubernetes.io/name"] == job["metadata"]["name"]
+        for job in jobs
+    )
 
 
 def check_client_scopes(realm):
@@ -67,25 +75,19 @@ def check_client_scopes(realm):
         for mapper in client["protocolMappers"]
         if mapper["name"] == PREFERRED_USERNAME_MAPPER
     ]
-    assert len(preferred) == 1, preferred
-    assert preferred[0]["protocolMapper"] == "oidc-usermodel-attribute-mapper"
-    assert preferred[0]["config"] == {
-        "user.attribute": "maas_preferred_username",
-        "claim.name": "preferred_username",
-        "jsonType.label": "String",
-        "id.token.claim": "true",
-        "access.token.claim": "true",
-        "userinfo.token.claim": "true",
-    }
+    assert not preferred, preferred
 
 
 def check_user_profile(realm):
     providers = realm["components"]["org.keycloak.userprofile.UserProfileProvider"]
     assert len(providers) == 1, providers
-    config = json.loads(providers[0]["config"]["config-piece-0"][0])
+    config = json.loads(providers[0]["config"]["kc.user.profile.config"][0])
     username = next(attribute for attribute in config["attributes"] if attribute["name"] == "username")
+    email = next(attribute for attribute in config["attributes"] if attribute["name"] == "email")
     assert username["required"] == {}, username
     assert username["permissions"] == {"view": ["admin"], "edit": ["admin"]}, username
+    assert "required" not in email, email
+    assert email["permissions"] == {"view": ["admin"], "edit": ["admin"]}, email
     assert config["unmanagedAttributePolicy"] == "ADMIN_EDIT"
 
 
@@ -94,7 +96,7 @@ def check_identity_providers(realm):
     assert {provider["alias"] for provider in realm["identityProviders"]} == aliases
     for alias in aliases:
         provider = next(provider for provider in realm["identityProviders"] if provider["alias"] == alias)
-        assert provider["firstBrokerLoginFlowAlias"] == FLOW_ALIAS
+        assert provider["firstBrokerLoginFlowAlias"] == FIRST_BROKER_LOGIN_FLOW
         mappers = [
             mapper
             for mapper in realm["identityProviderMappers"]
@@ -160,6 +162,7 @@ def main():
     realms = {}
     for overlay in OVERLAYS:
         documents = render(overlay)
+        check_realm_sync_jobs(documents, overlay)
         realms[overlay] = realm_import(documents)
         check_flow(realms[overlay])
         check_client_scopes(realms[overlay])

@@ -37,6 +37,8 @@ host assigned by OpenShift and creates the `keycloak-public-url` ConfigMap. It
 does not install or use Argo CD or ACM. It still requires the CloudNativePG
 cluster, External Secrets, and cert-manager to be installed.
 The direct installer creates namespace `maas-db` when it does not exist.
+After Keycloak is ready, it runs the realm sync Jobs in order. A Job is a
+Kubernetes task that runs to completion.
 
 ## Topology
 
@@ -196,6 +198,7 @@ Keycloak Deployment is healthy:
 | Identity providers and identity provider mappers the realm has | Updates each in place: same id, so organization links and brokered users' links stay. Config keys the file doesn't set stay. |
 | Identity provider mappers | Deletes the mappers of the file's identity providers that the file doesn't have. Identity providers the file doesn't have, such as the console's organizations', keep all of theirs. |
 | Service-account users | Grants the roles the file gives them. |
+| Built-in broker flow, profile mapper, and user-profile settings | Sets the unique-user step to `REQUIRED`, keeps the organization membership step, and applies the mapper and profile settings through the Admin API. |
 
 A partial import with `ifResourceExists: OVERWRITE` isn't used: it deletes and
 re-creates each existing client and identity provider, which gives them new
@@ -242,10 +245,10 @@ accounts' role mappings) roles, and nothing outside `saas`. If a hook fails,
 the sync fails and the Application's retry policy runs it again; the failed Job
 stays for its logs until the next sync replaces it.
 
-`overlays/direct` (`install.sh`, without Argo CD) leaves both hooks out:
-`kubectl apply` would start them in no order and couldn't update them later.
-A direct install imports `saas` on the first start; apply later edits to it
-with a planned export/import or the admin API.
+`overlays/direct` leaves both hooks out of its first apply because `kubectl`
+does not order them with the Keycloak rollout. `install.sh` runs the same Jobs
+after Keycloak is ready. Apply later edits to `saas` with a planned
+export/import or the Admin API.
 
 ## Example Tenant Identity Providers
 
@@ -270,13 +273,16 @@ Each example tenant's `saas-broker` client links the standard `profile` and
 accepts `openid profile email`.
 
 The `saas` broker stores each imported user under a generated local username.
-That local username is only a storage handle; the user's stable identity is the
-broker subject. The upstream `preferred_username` is copied into
-`maas_preferred_username` and then emitted as `preferred_username` by the
-`tenant-demo` client mapper. The first broker login flow
-`ai-grid-first-broker-login` creates a unique local account and does not link
-an existing account by email. A matching email therefore stops the login
-instead of silently linking two different people.
+That local username is only a storage handle. The broker subject is the user's
+stable identity. The upstream `preferred_username` is copied into
+`maas_preferred_username`. The built-in `profile` scope username mapper reads
+that attribute and emits `preferred_username`. Users without that attribute,
+including service accounts, do not get this claim. The built-in first broker
+login flow creates a unique local account and adds the user to the linked
+organization. Realm sync sets its `idp-create-user-if-unique` step to
+`REQUIRED`, so Keycloak stops sign-in when a local account already matches the
+upstream email or username. The user can link the accounts later through
+Keycloak Account management.
 
 `grid-tenant-2-idp` contains `alice`, `bob`, and `carol`. Alice in
 `grid-tenant-1-idp` and Alice in `grid-tenant-2-idp` use the same external
@@ -305,12 +311,17 @@ subscription in the provider console is granted to group names, such as
 Every user in the files has a fixed `id`: it is the `sub` that `saas` links
 the user's brokered account to.
 
-Keycloak imports these realms once, so an edit to their files doesn't reach a
-hub where they exist. To apply one on a test hub, delete the realm (realm
-settings, Action, Delete) and restart Keycloak
-(`kubectl rollout restart deployment/keycloak -n maas-db`): the realm is
-imported again from Git, and the users in the files keep their ids, so their
-links in `saas` stay. Anything the realm's admin created in it is lost.
+Keycloak imports these example realms only when they do not exist. A file
+change does not update a realm that already exists. An existing
+`grid-tenant-2-idp` must include `ai-grid-bob` before the tenant-2 MaaS policy
+grants Bob access.
+
+If you apply a change on a test hub, delete the realm from Realm settings > Action > Delete.
+Deleting the realm also deletes data that realm admins added. After you delete
+the realm, restart Keycloak with
+`kubectl rollout restart deployment/keycloak -n maas-db`. Keycloak imports the
+realm from Git. User IDs in the files stay the same, so broker links in `saas`
+stay.
 
 On a hub whose tenant realms were imported before their users had fixed ids,
 those users get new ids at that import, and each one's link in `saas` still

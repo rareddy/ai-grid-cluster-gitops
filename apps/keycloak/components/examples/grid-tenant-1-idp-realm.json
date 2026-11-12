@@ -85,8 +85,7 @@
         "providerId": "declarative-user-profile",
         "subComponents": {},
         "config": {
-          "config-pieces-count": ["1"],
-          "config-piece-0": ["{\"unmanagedAttributePolicy\":\"ADMIN_EDIT\"}"]
+          "kc.user.profile.config": ["{\"unmanagedAttributePolicy\":\"ADMIN_EDIT\"}"]
         }
       }
     ]
