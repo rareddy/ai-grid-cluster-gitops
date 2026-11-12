@@ -97,6 +97,14 @@ spec:
                       podSelector:
                         matchLabels:
                           gateway.networking.k8s.io/gateway-name: maas-default-gateway
+                # Sovereignty fence in audit mode: counts what enforce would refuse, refuses nothing.
+                praxisConfig:
+                  render:
+                    gridServing:
+                      siteRoute:
+                        sovereignty:
+                          header: x-grid-sovereignty-zone
+                          mode: audit
               praxis-provider-gateway:
                 networkPolicy:
                   from:
