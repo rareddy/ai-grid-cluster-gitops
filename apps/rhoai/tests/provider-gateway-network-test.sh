@@ -124,12 +124,13 @@ def peers(entries):
     for entry in entries:
         if "ipBlock" in entry:
             result.append("ipBlock=" + entry["ipBlock"]["cidr"])
-        elif "namespaceSelector" in entry:
-            labels = entry["namespaceSelector"]["matchLabels"]
-            result.append("ns=" + ",".join(f"{key}={value}" for key, value in labels.items()))
-        elif "podSelector" in entry:
-            labels = entry["podSelector"]["matchLabels"]
-            result.append("pod=" + ",".join(f"{key}={value}" for key, value in labels.items()))
+        else:
+            parts = []
+            for field, prefix in (("namespaceSelector", "ns="), ("podSelector", "pod=")):
+                if field in entry:
+                    labels = entry[field]["matchLabels"]
+                    parts.append(prefix + ",".join(f"{key}={value}" for key, value in labels.items()))
+            result.append("+".join(parts))
     return " ".join(result)
 
 for document in yaml.safe_load_all(open(sys.argv[1])):
@@ -142,6 +143,7 @@ PY
 }
 
 BASE='pod=grid.opendatahub.io/gateway-client=true ns=network.openshift.io/policy-group=ingress'
+CONSUMER='ns=kubernetes.io/metadata.name=openshift-ingress+pod=gateway.networking.k8s.io/gateway-name=maas-default-gateway'
 INVALID='ipBlock=invalid ai-grid/machine-network label '
 
 check() {
@@ -296,18 +298,18 @@ INGRESS_NETWORK='{"ai-grid/role":"ingress","ai-grid/machine-network":"192.0.2.0_
 INFERENCE_NETWORK='{"ai-grid/role":"inference","ai-grid/machine-network":"192.0.2.0_24"}'
 COMBINED_NETWORK='{"ai-grid/role":"combined","ai-grid/machine-network":"192.0.2.0_24"}'
 
-check "ingress consumer has base peers only" "$BASE" ingress grid-gateway "$INGRESS"
+check "ingress consumer admits only the MaaS gateway" "$CONSUMER" ingress grid-gateway "$INGRESS"
 check "ingress has no provider gateway" "NO NETWORKPOLICY" ingress grid-provider-gateway "$INGRESS"
-check "ingress machine network is not exposed" "$BASE" ingress grid-gateway "$INGRESS_NETWORK"
+check "ingress machine network is not exposed" "$CONSUMER" ingress grid-gateway "$INGRESS_NETWORK"
 check "inference provider has base peers only" "$BASE" inference grid-provider-gateway "$INFERENCE"
 check "inference has no consumer gateway" "NO NETWORKPOLICY" inference grid-gateway "$INFERENCE"
 check "inference machine network reaches provider" "$BASE ipBlock=192.0.2.0/24" \
   inference grid-provider-gateway "$INFERENCE_NETWORK"
 check "combined provider has base peers only" "$BASE" combined grid-provider-gateway "$COMBINED"
-check "combined consumer has base peers only" "$BASE" combined grid-gateway "$COMBINED"
+check "combined consumer admits only the MaaS gateway" "$CONSUMER" combined grid-gateway "$COMBINED"
 check "combined machine network reaches provider only" "$BASE ipBlock=192.0.2.0/24" \
   combined grid-provider-gateway "$COMBINED_NETWORK"
-check "combined consumer excludes machine network" "$BASE" combined grid-gateway "$COMBINED_NETWORK"
+check "combined consumer excludes machine network" "$CONSUMER" combined grid-gateway "$COMBINED_NETWORK"
 
 for value in not-a-cidr 192.0.2.1_0 0.0.0.0_0 192.0.2.0_33 256.0.2.0_24 \
              192.0.2.0/24 192.0.2_24 '192.0.2.0_24 '; do

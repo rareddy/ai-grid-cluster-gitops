@@ -88,14 +88,15 @@ spec:
                 value: '{{ ne (index .metadata.labels "local-cluster") "true" | toString }}'
             values: |
               praxis-gateway:
+                # The consumer gateway does not authenticate its caller, so only the MaaS gateway's pods reach it.
                 networkPolicy:
                   from:
-                    - podSelector:
-                        matchLabels:
-                          grid.opendatahub.io/gateway-client: "true"
                     - namespaceSelector:
                         matchLabels:
-                          network.openshift.io/policy-group: ingress
+                          kubernetes.io/metadata.name: openshift-ingress
+                      podSelector:
+                        matchLabels:
+                          gateway.networking.k8s.io/gateway-name: maas-default-gateway
               praxis-provider-gateway:
                 networkPolicy:
                   from:
