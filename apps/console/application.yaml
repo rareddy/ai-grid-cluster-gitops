@@ -22,16 +22,16 @@ spec:
         releaseName: ai-grid-provider-console
         valuesObject:
           # By digest: tags can be overwritten. Console and chart are main
-          # 5d490c8 (console #175); the backend is main cd03b7f (backend #88),
-          # the console's .backend-api-version. Move them together: this
-          # console sends what only that backend accepts.
+          # 5d490c8 (console #175); backend PR #86 head 7e848ea includes
+          # main cd03b7f (backend #88), preserving the console API contract.
           images:
             console:
               tag: sha-5d490c87f4145c2c06e867547f5e8f869911081b
               digest: sha256:f142643fb4c1d6969b0b4499ddfd738f1b271378a1904e4e0d288450bd8a17ac
             backend:
-              tag: sha-cd03b7fab706e4e4836eac98f9dd0935ab85e734
-              digest: sha256:17c591fc78c9acdd2fd99756c3c8f7ee3c9ee8b76958787681df8856ae509763
+              repository: quay.io/rareddy/ai-grid-provider-backend
+              tag: pr86-7e848ea-20261113
+              digest: sha256:7f3b0f61e785ab6049a5a6c1e8d47e7c7bf9d524c757dfb9afb3eea0a05408c1
             authProxy:
               tag: ""
               digest: sha256:1a5f6e220362aa2077026bb7e3091c38f80aac861fa060b08045e58e783d5bc5
