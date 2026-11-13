@@ -8,7 +8,7 @@
 # itself never appears in a managed cluster's manifest either.
 #
 # Granted narrowly on purpose, mirroring
-# apps/ai-grid-o11y/manifests/rbac-provision-loki-key.yaml: `resourceNames`
+# charts/ai-grid-o11y/templates/rbac-provision-loki-key.yaml: `resourceNames`
 # pins the single object each rule needs, except `create`/`update` on Secrets,
 # where resourceNames cannot restrict creation (the name is in the request
 # body) -- so that rule is scoped to the namespace instead.

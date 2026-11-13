@@ -2,7 +2,7 @@ apiVersion: monitoring.rhobs/v1alpha1
 kind: ScrapeConfig
 metadata:
   name: rhai-metrics
-  namespace: open-cluster-management-observability
+  namespace: {{ .Values.acmObservabilityNamespace }}
   labels:
     app.kubernetes.io/component: user-workload-metrics-collector
     app.kubernetes.io/part-of: multicluster-observability-addon
@@ -19,13 +19,13 @@ spec:
       configMap:
         name: openshift-service-ca.crt
         key: service-ca.crt
-    serverName: data-science-collector-prometheus.redhat-ods-monitoring.svc
+    serverName: data-science-collector-prometheus.{{ .Values.o11yNamespace }}.svc
     insecureSkipVerify: false
   # Each collector holds its own allocated targets. The Service's ClusterIP is not an aggregate.
   kubernetesSDConfigs:
     - role: EndpointSlice
       namespaces:
-        names: [redhat-ods-monitoring]
+        names: [{{ .Values.o11yNamespace }}]
       selectors:
         - role: EndpointSlice
           label: kubernetes.io/service-name=data-science-collector-prometheus

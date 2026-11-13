@@ -2,7 +2,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   generateName: provision-loki-s3-secret-
-  namespace: redhat-ods-monitoring
+  namespace: {{ .Values.o11yNamespace }}
   annotations:
     # The LokiStack (wave 2) reports Degraded without this Secret, and a
     # Degraded resource fails the sync, so a PostSync hook would never run.
@@ -20,7 +20,7 @@ spec:
           command: ["/bin/bash", "-c"]
           args:
             - |
-              O11Y_NS=redhat-ods-monitoring
+              O11Y_NS={{ .Values.o11yNamespace }}
               LOKI_NAME=usage-logs
               BUCKET=$(oc get cm ${LOKI_NAME}-bucket -n "$O11Y_NS" -o jsonpath='{.data.BUCKET_NAME}')
               AK=$(oc get secret ${LOKI_NAME}-bucket -n "$O11Y_NS" -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)
@@ -29,7 +29,7 @@ spec:
 
               oc create secret generic ${LOKI_NAME}-object-storage -n "$O11Y_NS" \
                 --from-literal=bucketnames="$BUCKET" \
-                --from-literal=endpoint="https://s3.openshift-storage.svc:443" \
+                --from-literal=endpoint="{{ .Values.lokiStack.s3Endpoint }}" \
                 --from-literal=access_key_id="$AK" \
                 --from-literal=access_key_secret="$SK" \
                 --dry-run=client -o yaml | oc apply -f -

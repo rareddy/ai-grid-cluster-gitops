@@ -1,0 +1,12 @@
+# Renders the raw Perses dashboards from ../dashboards/ with the namespace injected.
+# The dashboard files are kept free of Helm templating (they contain literal
+# Perses/Go template braces), so they are parsed with fromYaml instead.
+{{- range $path, $content := .Files.Glob "dashboards/*.yaml" }}
+{{- $dashboard := toString $content | fromYaml }}
+{{- if not $dashboard.metadata }}
+{{- fail (printf "dashboard %s has no metadata" $path) }}
+{{- end }}
+{{- $_ := set $dashboard.metadata "namespace" $.Values.o11yNamespace }}
+---
+{{ toYaml $dashboard }}
+{{- end }}
