@@ -2,7 +2,7 @@ apiVersion: perses.dev/v1alpha2
 kind: PersesDatasource
 metadata:
   name: cluster-prometheus-datasource
-  namespace: {{ .Values.o11yNamespace }}
+  namespace: redhat-ods-monitoring
 spec:
   client:
     tls:
@@ -18,5 +18,5 @@ spec:
         proxy:
           kind: HTTPProxy
           spec:
-            url: http://rbac-query-proxy.{{ .Values.acmObservabilityNamespace }}.svc.cluster.local:8080
+            url: http://rbac-query-proxy.open-cluster-management-observability.svc.cluster.local:8080
         scrapeInterval: 5m

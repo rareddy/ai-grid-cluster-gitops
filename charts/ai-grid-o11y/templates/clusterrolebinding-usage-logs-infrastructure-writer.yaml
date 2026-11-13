@@ -9,4 +9,4 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: usage-logs-writer
-    namespace: {{ .Values.o11yNamespace }}
+    namespace: redhat-ods-monitoring

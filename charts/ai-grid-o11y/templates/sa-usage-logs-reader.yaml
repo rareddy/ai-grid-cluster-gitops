@@ -2,4 +2,4 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: usage-logs-reader
-  namespace: {{ .Values.o11yNamespace }}
+  namespace: redhat-ods-monitoring

@@ -4,11 +4,6 @@
 # override only what differs in this environment. Entries left commented match
 # the chart's defaults.
 #
-# Namespace hosting the usage-logs stack (LokiStack, Perses dashboards, collector ServiceAccounts).
-#o11yNamespace: redhat-ods-monitoring
-# Namespace of the ACM hub observability stack (ScrapeConfigs, rbac-query-proxy).
-#acmObservabilityNamespace: open-cluster-management-observability
-#
 #lokiStack:
 #  size: 1x.demo
 #  retentionDays: 30

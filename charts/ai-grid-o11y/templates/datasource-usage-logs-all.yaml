@@ -2,7 +2,7 @@ apiVersion: perses.dev/v1alpha1
 kind: PersesDatasource
 metadata:
   name: usage-logs-all
-  namespace: {{ .Values.o11yNamespace }}
+  namespace: redhat-ods-monitoring
   annotations:
     # After the LokiStack (wave 2), whose gateway CA bundle it needs.
     argocd.argoproj.io/sync-wave: "3"
@@ -17,7 +17,7 @@ spec:
         proxy:
           kind: HTTPProxy
           spec:
-            url: 'https://usage-logs-gateway-http.{{ .Values.o11yNamespace }}.svc.cluster.local:8080/api/logs/v1/infrastructure'
+            url: 'https://usage-logs-gateway-http.redhat-ods-monitoring.svc.cluster.local:8080/api/logs/v1/infrastructure'
             allowedEndpoints:
               - endpointPattern: "/loki/api/v1/query"
                 method: GET
