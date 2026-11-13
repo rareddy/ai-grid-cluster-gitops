@@ -197,6 +197,25 @@ assert set(services) >= expected_services, f"missing services: {expected_service
 assert set(services).isdisjoint({"grid-gateway", "grid-provider-gateway"} - expected_services), \
     f"unexpected gateways: {set(services) & ({'grid-gateway', 'grid-provider-gateway'} - expected_services)}"
 
+serving = [document for document in documents if document.get("kind") == "Gateway"
+           and document["metadata"]["name"] == "openshift-ai-inference"]
+if role == "ingress":
+    assert not serving, "an ingress site has no serving gateway"
+else:
+    listeners = {listener["name"]: listener for listener in serving[0]["spec"]["listeners"]}
+    assert set(listeners) == {"http", "https", "grid"}, f"serving gateway listeners: {sorted(listeners)}"
+    for name in ("http", "https"):
+        assert "options" not in listeners[name].get("tls", {}), \
+            f"the {name} listener must not ask its callers for a client certificate"
+    grid = listeners["grid"]
+    assert (grid["port"], grid["protocol"]) == (8443, "HTTPS"), "the grid listener moved"
+    assert grid["tls"]["options"] == {"gateway.istio.io/tls-terminate-mode": "MUTUAL"}, \
+        "the grid listener must require a client certificate"
+    assert grid["tls"]["certificateRefs"] == listeners["https"]["tls"]["certificateRefs"], \
+        "the grid listener must serve the https listener's certificate, which names its client CA Secret"
+    assert all(listener["allowedRoutes"] == listeners["https"]["allowedRoutes"] for listener in listeners.values()), \
+        "every serving listener admits the same namespaces"
+
 expected_model_clients = {
     "ingress": set(),
     "inference": {"grid-model-client", "grid-model-client-token"},

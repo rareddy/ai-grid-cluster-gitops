@@ -196,6 +196,33 @@ spec:
                     name: grid-model-client
                     namespace: redhat-ai-grid
 
+    # The serving gateway's grid listener verifies client certificates against the Grid
+    # CA, which the mesh reads from <serving certificate>-cacert in the gateway's
+    # namespace. Only the public certificate is copied, and only where the site has
+    # both the delivered Grid CA and a serving gateway certificate.
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: serving-gateway-grid-client-ca
+        spec:
+          remediationAction: enforce
+          severity: high
+          pruneObjectBehavior: DeleteAll
+          object-templates-raw: |
+            {{- if and (lookup "v1" "Secret" "redhat-ai-grid" "grid-ca") (lookup "v1" "Secret" "openshift-ingress" "openshift-ai-inference-service-tls") }}
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: Secret
+                type: Opaque
+                metadata:
+                  name: openshift-ai-inference-service-tls-cacert
+                  namespace: openshift-ingress
+                data:
+                  cacert: '{{ fromSecret "redhat-ai-grid" "grid-ca" "ca.crt" }}'
+            {{- end }}
+
     # odh-model-controller grants the grid model client `post` on each published model's
     # path; Kubernetes only lets it grant a verb it holds, and its bundled ClusterRole
     # (RHOAI 3.6 nightly, ee3dcb8) lacks `post`. This ClusterRole, bound per opted-in
