@@ -82,12 +82,32 @@ def check_user_profile(realm):
     providers = realm["components"]["org.keycloak.userprofile.UserProfileProvider"]
     assert len(providers) == 1, providers
     config = json.loads(providers[0]["config"]["kc.user.profile.config"][0])
-    username = next(attribute for attribute in config["attributes"] if attribute["name"] == "username")
-    email = next(attribute for attribute in config["attributes"] if attribute["name"] == "email")
+    attributes = {attribute["name"]: attribute for attribute in config["attributes"]}
+    assert {"username", "email", "firstName", "lastName"} <= attributes.keys(), attributes
+    username = attributes["username"]
+    assert username["displayName"] == "${username}", username
     assert username["required"] == {}, username
     assert username["permissions"] == {"view": ["admin"], "edit": ["admin"]}, username
-    assert "required" not in email, email
-    assert email["permissions"] == {"view": ["admin"], "edit": ["admin"]}, email
+    assert username["validations"] == {
+        "length": {"min": 3, "max": 255},
+        "username-prohibited-characters": {},
+        "up-username-not-idn-homograph": {},
+    }, username
+    for name in ("email", "firstName", "lastName"):
+        attribute = attributes[name]
+        assert attribute["required"] == {"roles": ["user"]}, attribute
+        assert attribute["permissions"] == {
+            "view": ["admin", "user"], "edit": ["admin", "user"]
+        }, attribute
+        assert attribute["validations"]["length"] == {"max": 255}, attribute
+        validator = "email" if name == "email" else "person-name-prohibited-characters"
+        assert attribute["validations"][validator] == {}, attribute
+        assert attribute["displayName"] == "${%s}" % name, attribute
+    assert config["groups"] == [{
+        "name": "user-metadata",
+        "displayHeader": "User metadata",
+        "displayDescription": "Attributes, which refer to user metadata",
+    }], config
     assert config["unmanagedAttributePolicy"] == "ADMIN_EDIT"
 
 

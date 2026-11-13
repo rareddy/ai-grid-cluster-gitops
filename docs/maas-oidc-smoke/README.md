@@ -37,7 +37,7 @@ GATEWAY_KUBE_CONTEXT='<context-name>' \
   docs/maas-oidc-smoke/scripts/maas-oidc-smoke.sh alice
 ```
 
-Run it for the user-subject authorization policy:
+Run it for Bob's dedicated group policy:
 
 ```sh
 docs/maas-oidc-smoke/scripts/maas-oidc-smoke.sh bob
@@ -74,26 +74,42 @@ fail unless inference uses a given model.
 
 ## What the test verifies
 
-The smoke test compares identity by issuer and subject, not by username. The
-broker's local username is only a storage handle and may differ from the
+The script records the broker issuer and subject. The isolation wrapper compares
+subjects within that shared broker realm. It does not compare issuers.
+The broker's local username is a storage handle and can differ from the
 upstream `preferred_username`. The example tenant-2 policy grants Bob's
 subscription through group `ai-grid-bob`, so Bob's access does not depend on
 the literal username `bob`.
 
 Set `BROKER_HINT` and `PASSWORD_SECRET_KEY` to select either example identity
 provider while keeping the external username `alice`. Set `IDENTITY_ONLY=1` to
-stop after the token exchange, `/v1/me`, and `/v1/subscriptions`. This mode
+stop after the token exchange, `/v1/me`, `/v1/models`, and `/v1/subscriptions`. This mode
 does not create API keys, call inference, or run the rate-limit probe. Set
 `IDENTITY_RESULT_FILE` to write issuer, subject, organization, profile, and
-bounded subscription metadata. The file is created with mode `0600` and never
+subscription IDs, organization IDs, roles, and model names. The file is created with mode `0600` and never
 contains tokens, passwords, client secrets, or API keys.
 
 Use `scripts/identity-isolation-smoke.sh` to compare two companies that both
 use the external username `alice`. Set `IDP_A`, `IDP_B`, `ORG_A`, `ORG_B`,
 `PASSWORD_SECRET_KEY_A`, and `PASSWORD_SECRET_KEY_B`. The wrapper authenticates
-A, B, A, and B, requires distinct cross-company subjects, requires stable
-subjects on repeat, and checks the expected organization boundaries. Matching
-emails must fail rather than link the two company accounts.
+A, B, A, and B. It requires distinct cross-company subjects and stable subjects
+on repeat. For each company's first result, it requires `preferred_username=alice`
+and nonempty organization and subscription lists restricted to the expected organization.
+It does not test key ownership, cross-company key operations, profile renames,
+or rejection of matching emails.
+
+The wrapper currently reads the legacy `https://redhat.com/maas/orgs` array
+from the token. This repository's realm emits flat `org_id`, `org_name`, and
+`roles` claims. The wrapper's organization assertion fails for those tokens
+until the script supports flat claims. The main script also prints organizations
+from the legacy array, so that output omits flat organization claims.
+
+For the reference providers, use `grid-tenant-1` and `grid-tenant-2` as the IdP aliases.
+Their organization IDs are `42c3e46f-2477-44d7-a85b-d3b43f6b31fa` and
+`53d4f57e-3588-55e8-b96c-4ec54a7c42fa`, respectively. Their password keys are
+`GRID_TENANT_1_TEST_USER_PASSWORD` and `GRID_TENANT_2_TEST_USER_PASSWORD`.
+This change requires freshly installed example realms, as described in the
+[Keycloak README](../../apps/keycloak/README.md#deployment-scope).
 
 Run the wrapper only in an authorized environment. Contributors run its input
 checks and shell syntax checks; they do not run the live browserless login.
@@ -147,6 +163,10 @@ Successful runs write private runtime credentials under `/tmp`:
 
 Remove these files when they are no longer needed. API keys created by the
 script expire after one hour.
+
+Identity-only runs also write the access-token file. The isolation wrapper
+uses `alice` for both companies, so `/tmp/maas-alice-access-token` contains the
+last login's token. Its temporary identity-result files are removed on exit.
 
 ## GitOps and secret safety
 

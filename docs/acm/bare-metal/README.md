@@ -56,7 +56,7 @@ reads them; nothing identifies a site in a shared file.
 | `ai-grid/metallb-pool=<first>-<last>` | ManagedCluster label | A site without a load balancer; more pools or an existing operator in `apps/metallb/values-<cluster>.yaml`, committed before the label ([MetalLB](../../../apps/metallb/README.md)). |
 | `ai-grid/platform-namespaces=true` | ManagedCluster label | Only managed OpenShift, whose platform owns the Loki operator namespace; not on bare metal. |
 | `ai-grid/machine-network=<cidr with _>` | ManagedCluster label | Only where the provider gateway sees peers as node machine addresses. On the qualified path (OVN-Kubernetes, host-network router) peers arrive from the router node's management address, which the ingress policy group admits; [cluster onboarding](../cluster-onboarding/README.md) says how to observe the path. |
-| `lokistack.storageClassName` and the object-storage mode | `apps/ai-grid-o11y/values-site.yaml` | The hub, before the usage-logs chart syncs ([usage logs](../../../apps/ai-grid-o11y/chart/README.md)). |
+| `lokistack.storageClassName` and the object-storage mode | `apps/ai-grid-o11y/values-site.yaml` | The hub, before the usage-logs chart syncs ([usage logs](../../../apps/ai-grid-usage-logs/README.md)). |
 | MaaS home ingress CA | Combined hub: automatic through `rhoai-ingress-clusters`; dedicated home: `docs/acm/cluster-onboarding/trust-external-services-ca.sh` | Every MaaS site whose home's ingress certificate is privately signed. |
 | Console backend's Keycloak URL | `KEYCLOAK_BACKEND_URL` to `apps/console/create-secrets.sh` | When the backend cannot trust the ingress CA ([console](../../../apps/console/README.md)). |
 

@@ -130,7 +130,7 @@ is not appending the delivered CA to its system trust pool.
 A record pushed at a site collector's receiver should arrive in the hub store
 with `cluster_name`, `model`, `service_name`, `organization_id`, and `user_id`
 promoted as stream labels. `user_id` is the URL-safe Base64 encoding of the
-JSON array `[identity_source, identity_issuer, subject]`.
+JSON array `[identity_issuer, subject]`.
 
 Historical streams keep the labels they had when they were written. Organization
 admins retain the existing scoped historical view. The identity labels start
