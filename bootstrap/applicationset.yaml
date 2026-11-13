@@ -23,11 +23,12 @@ spec:
           # up a second LokiStack and a second object bucket beside it.
           - path: apps/ai-grid-usage-logs/application.yaml
             exclude: true
-          # Only the dedicated-hub profile installs cert-manager, registers clusters and runs MaaS on a site.
+          # Only the dedicated-hub profile installs cert-manager and registers clusters.
           - path: apps/cert-manager/application.yaml
             exclude: true
           - path: apps/argo-registration/application.yaml
             exclude: true
+          # MaaS state on a labelled site is applied by hand, never generated.
           - path: apps/external-services/application.yaml
             exclude: true
           # ODF is generated separately once the hub's version is known.

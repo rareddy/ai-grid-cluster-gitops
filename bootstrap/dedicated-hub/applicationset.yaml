@@ -31,7 +31,9 @@ spec:
           - path: apps/console/application.yaml
           - path: apps/gitops-config/application.yaml
           - path: apps/grid-bootstrap/application.yaml
-          - path: apps/external-services/application.yaml
+          # MaaS state runs on this hub. apps/external-services, which holds it on a
+          # labelled site instead, is applied by hand: a hub that runs it itself
+          # would carry an empty external-services Placement.
           - path: apps/maas-db/application.yaml
           - path: apps/keycloak/application.yaml
           - path: apps/limitador-redis/application.yaml

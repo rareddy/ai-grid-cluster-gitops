@@ -7,7 +7,11 @@ ones the user owns in production. See
 
 ```sh
 oc label managedcluster site-a ai-grid/external-services=true
+oc apply -f apps/external-services/application.yaml
 ```
+
+No root ApplicationSet generates this app, so a hub that runs MaaS state itself
+carries no external-services Placement.
 
 The `external-services` ApplicationSet installs these on it, reusing each app's
 manifests:
