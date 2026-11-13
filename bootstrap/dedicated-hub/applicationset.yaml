@@ -24,7 +24,6 @@ spec:
         files:
           - path: apps/acm/application.yaml
           - path: apps/acm-models/application.yaml
-          - path: apps/ai-grid-o11y/application.yaml
           - path: apps/ai-grid-policies/application.yaml
           - path: apps/ai-grid-spokes/application.yaml
           - path: apps/cert-manager/application.yaml
@@ -47,6 +46,45 @@ spec:
           # apps/ai-grid-o11y's LokiStack needs, and the ACM policy that hands each site
           # the writer token. apps/odf, its object storage, is listed below.
           - path: apps/ai-grid-usage-logs/application.yaml
+    # ai-grid-o11y is specified here rather than in
+    # apps/ai-grid-o11y/application.yaml. The ref source exposes this repo to
+    # the chart source as $values, so values/hub/ai-grid-o11y/values.yaml
+    # layers environment-specific configuration over the chart's defaults.
+    - list:
+        elements:
+          - metadata:
+              name: ai-grid-o11y
+              namespace: openshift-gitops
+            spec:
+              project: default
+              sources:
+                - repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
+                  targetRevision: nov12
+                  ref: values
+                - repoURL: https://github.com/rareddy/ai-grid-cluster-gitops.git
+                  targetRevision: nov12
+                  path: charts/ai-grid-o11y
+                  helm:
+                    valueFiles:
+                      - values.yaml
+                      - $values/values/hub/ai-grid-o11y/values.yaml
+              destination:
+                server: https://kubernetes.default.svc
+                namespace: open-cluster-management-observability
+              syncPolicy:
+                automated:
+                  prune: true
+                  selfHeal: true
+                retry:
+                  refresh: true
+                  limit: 10
+                  backoff:
+                    duration: 30s
+                    factor: 2
+                    maxDuration: 10m
+                syncOptions:
+                  - CreateNamespace=true
+                  - SkipDryRunOnMissingResource=true
     # Only ODF needs cluster metadata. Wait for ACM registration and its
     # version label: the operator channel must match the hub's OpenShift version.
     - matrix:
