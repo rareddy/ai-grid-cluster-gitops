@@ -37,5 +37,5 @@ external:
       name: grid-ca
     ca:
       # Preserve the existing CA while external issuance takes over identities.
-      mode: Existing
+      mode: Generate
       secretName: grid-ca-key

@@ -42,7 +42,7 @@ spec:
                         apps.open-cluster-management.io/acm-cluster: "true"
                         name: '{{ .clusterName }}'
           - git:
-              repoURL: https://github.com/ai-grid-cloud/ai-grid-shared-catalog.git
+              repoURL: https://github.com/rareddy/ai-grid-catalog.git
               revision: main
               directories:
                 - path: 'catalog/clusters/{{.name}}'
