@@ -90,7 +90,7 @@ as an override when present.
 
 - A default StorageClass. RHOAI monitoring claims 20Gi for metrics and 10Gi for
   traces on every site. An ingress or combined site claims 20Gi for its MaaS
-  database replica. The sample models pull weights at start and claim nothing.
+  database replica. Models pull weights at start and claim nothing.
 - Submariner gateway nodes. Every managed cluster gets the add-on with two
   gateways and Globalnet. Label two workers `submariner.io/gateway=true` on each
   cluster, the hub included, because the add-on has no cloud credentials to do it. Over it the site reaches the hub's enrollment service
@@ -105,8 +105,8 @@ as an override when present.
   A-only DNS configuration that incorrectly answers AAAA with NXDOMAIN (A-only
   itself is fine: answer NODATA) leaves every GridSite Connecting. Check with
   `dig AAAA router-default.apps.<cluster>.<domain>`.
-- Capacity for the sample models: three replicas of 1 CPU and 10Gi memory. A
-  GPU model needs GPU nodes and the NVIDIA operator, which this repository does
+- Capacity for the models you deploy. The opt-in sample model needs three
+  replicas of 1 CPU and 10Gi memory. A GPU model needs GPU nodes and the NVIDIA operator, which this repository does
   not install.
 - No registry setup. Policies deliver the pull Secrets and the image mirror.
 
@@ -256,7 +256,7 @@ kubectl --context "$HUB_CONTEXT" -n "$CLUSTER_NAME" get managedclusteraddon sear
 The new cluster appears in the acm-models-gitops-cluster placement decision.
 Its `search-collector` add-on reports Available.
 The role placements then generate its applications: rhoai for every role,
-grid-provider-gateway and the sample model for inference and combined, maas-db
+grid-provider-gateway for inference and combined, maas-db
 for ingress and combined. Application names carry the cluster name.
 
 On the site, once the applications are Synced and Healthy:

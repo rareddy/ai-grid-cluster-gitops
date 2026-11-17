@@ -31,6 +31,9 @@ spec:
           # MaaS state on a labelled site is applied by hand, never generated.
           - path: apps/external-services/application.yaml
             exclude: true
+          # The sample model is opt-in: a new grid serves only the console's catalog.
+          - path: apps/acm-models-sample/application.yaml
+            exclude: true
           # ODF is generated separately once the hub's version is known.
           - path: apps/odf/application.yaml
             exclude: true

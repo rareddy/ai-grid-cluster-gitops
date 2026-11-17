@@ -113,9 +113,9 @@ spec:
   # ODF provides the object storage ACM observability needs, so acm syncs
   # the full apps/acm/manifests. A new grid generates its CA, and grid-bootstrap
   # binds global in place of the rhoai app's binding. acm-models brings the
-  # sample model and the console's catalog (its ApplicationSets and
-  # AppProjects), not its GitOpsCluster: argo-registration registers clusters
-  # here.
+  # console's catalog (its ApplicationSets and AppProjects), not its
+  # GitOpsCluster: argo-registration registers clusters here. The sample model
+  # (apps/acm-models-sample) is opt-in and not listed above.
   # Limitador runs on the sites, so limitador-redis leaves out its storage config.
   # ODF's operator channel follows the hub's OpenShift minor version.
   # A hub labelled ai-grid/odf-operatorgroup=existing keeps its own OperatorGroup.
@@ -134,7 +134,7 @@ spec:
     {{- $_ := set $spec.source.helm "parameters" $params }}
     {{- end }}
     {{- if eq .metadata.name "acm-models" }}
-    {{- $_ := set $spec.source "directory" (dict "include" "{facebook-opt-125m-03-applicationset.yaml,maas-03-applicationset.yaml,catalog-03-appprojects.yaml,catalog-04-applicationsets.yaml}") }}
+    {{- $_ := set $spec.source "directory" (dict "include" "{catalog-03-appprojects.yaml,catalog-04-applicationsets.yaml}") }}
     {{- end }}
     {{- if eq .metadata.name "limitador-redis" }}
     {{- $_ := set $spec.source "directory" (dict "exclude" "{04-limitador-redis-secret.yaml,20-limitador-storage.yaml}") }}

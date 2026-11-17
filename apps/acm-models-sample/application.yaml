@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  # Opt-in sample: the facebook-opt-125m model on inference sites and its MaaS
+  # objects on ingress sites. Neither bootstrap profile installs it by default;
+  # a new grid serves only the provider console's catalog. To deploy the sample,
+  # remove its exclude entry from bootstrap/applicationset.yaml, or add this file
+  # to the dedicated-hub root's list in bootstrap/dedicated-hub/applicationset.yaml.
+  name: acm-models-sample
+  namespace: openshift-gitops
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ai-grid-cloud/ai-grid-cluster-gitops.git
+    targetRevision: HEAD
+    path: apps/acm-models-sample/hub
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-gitops
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
+    syncOptions:
+      - SkipDryRunOnMissingResource=true

@@ -4,8 +4,12 @@ This app owns the internal `LLMInferenceService` deployment and its
 model-facing MaaS resources. Supporting namespaces, NetworkPolicies, and the
 Grid `ExternalProvider` are owned by the RHOAI apps.
 
-The sample model goes to AI Grid sites where models run (Placement
-`ai-grid-inference`), and its MaaS objects to sites that run MaaS
+The sample model is opt-in: no bootstrap profile deploys it, so a new grid
+serves only the provider console's catalog. Its ApplicationSets are in
+[apps/acm-models-sample](../acm-models-sample/application.yaml); to deploy it,
+remove that app's exclude entry from `bootstrap/applicationset.yaml`, or list
+it in the dedicated-hub root. It then goes to AI Grid sites where models run
+(Placement `ai-grid-inference`), and its MaaS objects to sites that run MaaS
 (`ai-grid-ingress`); both Placements are `apps/ai-grid-spokes`'. An unlabelled
 hub gets neither.
 
