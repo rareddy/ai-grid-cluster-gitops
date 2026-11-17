@@ -1299,6 +1299,26 @@ spec:
         hs.status = "Progressing"
         hs.message = "ConfigurationPolicy compliance: " .. obj.status.compliant
         return hs
+    - group: view.open-cluster-management.io
+      kind: ManagedClusterView
+      check: |
+        hs = {}
+        if obj.status ~= nil and obj.status.conditions ~= nil then
+          for _, condition in ipairs(obj.status.conditions) do
+            if condition.type == "Processing" then
+              if condition.status == "True" then
+                hs.status = "Healthy"
+              else
+                hs.status = "Degraded"
+              end
+              hs.message = condition.message or condition.reason or "ManagedClusterView processing"
+              return hs
+            end
+          end
+        end
+        hs.status = "Progressing"
+        hs.message = "Waiting for the ManagedClusterView Processing condition"
+        return hs
     - group: redis.redis.opstreelabs.in
       kind: RedisReplication
       check: |

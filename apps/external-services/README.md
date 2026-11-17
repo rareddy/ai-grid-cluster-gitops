@@ -25,6 +25,10 @@ manifests:
 
 The hub Policies here give this cluster its Keycloak public URL and `maas-api`'s
 database connection, both read from this cluster's own Route and Secrets. The
+`external-services-ingress-ca-view` ApplicationSet creates a ManagedClusterView
+of this cluster's `openshift-config-managed/default-ingress-cert` in its hub
+namespace, from which `rhoai-ingress-clusters` delivers the Keycloak CA to every
+MaaS site. The
 tenant Policy (`apps/rhoai/hub`) finds Keycloak on this cluster through its
 console-URL cluster claim.
 

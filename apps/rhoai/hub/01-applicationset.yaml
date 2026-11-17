@@ -206,6 +206,14 @@ spec:
           name: default-dsci
           jsonPointers:
             - /spec/monitoring/usageLogs
+          # On MaaS sites, apps/rhoai/hub's rhoai-authorino-home-keycloak-ca
+          # Policy appends the MaaS home's Keycloak CA to this field. Keep
+          # ingress/combined in step with 03-ingress-clusters-placement.yaml.
+          jqPathExpressions:
+            - >-
+              select("{{ index .metadata.labels "ai-grid/role" }}" == "ingress"
+                or "{{ index .metadata.labels "ai-grid/role" }}" == "combined")
+              | .spec.trustedCABundle.customCABundle
         - group: ""
           kind: Service
           name: grid-provider-gateway
