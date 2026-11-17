@@ -130,17 +130,6 @@ the same directory: a shared key would replace the system bundle, and a
 Keycloak Route with a publicly signed certificate would then fail OIDC
 discovery. With its own key, Authorino trusts both bundles.
 
-The same ingress Policy adds the hub CA to the existing DSCI custom CA bundle
-for the portal authentication proxy (RHAI-49329). RHOAI publishes it in
-`odh-trusted-ca-bundle`, and the portal controller rolls the proxy on changes.
-Existing custom CAs are retained, including old hub CAs after rotation; remove
-retired CAs explicitly when no longer needed. On ingress and combined sites
-the Policy is the only writer of `trustedCABundle.customCABundle` in every
-topology, and Argo ignores it, so Helm values for that field do not apply
-there. With an external-services home the Policy keeps the field as it is.
-Reverting the patch restores chart ownership of the field; preserve any
-required custom CAs in chart values before syncing a rollback.
-
 When MaaS's shared state is on a dedicated cluster labelled
 `ai-grid/external-services=true`, the hub cannot read that cluster's
 `router-ca` Secret directly. The Policy therefore creates an empty

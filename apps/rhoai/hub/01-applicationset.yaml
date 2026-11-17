@@ -201,20 +201,11 @@ spec:
         # not knowable at render time. Without this, Argo's selfHeal and that
         # policy fight over one object every cycle. Argo still owns the rest of
         # spec.monitoring -- metrics, traces and log forwarding.
-        # On MaaS sites (the roles 03-ingress-clusters-placement.yaml selects),
-        # the ingress Policy also owns spec.trustedCABundle.customCABundle: it
-        # adds the hub Keycloak CA for the portal auth proxy.
         - group: dscinitialization.opendatahub.io
           kind: DSCInitialization
           name: default-dsci
           jsonPointers:
             - /spec/monitoring/usageLogs
-          jqPathExpressions:
-            # Keep these roles in step with 03-ingress-clusters-placement.yaml.
-            - >-
-              select("{{ index .metadata.labels "ai-grid/role" }}" == "ingress"
-                or "{{ index .metadata.labels "ai-grid/role" }}" == "combined")
-              | .spec.trustedCABundle.customCABundle
         - group: ""
           kind: Service
           name: grid-provider-gateway
