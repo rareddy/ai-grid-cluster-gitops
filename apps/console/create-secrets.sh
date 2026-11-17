@@ -24,7 +24,7 @@ Create or update the provider console's Secrets and OAuthClient on the hub.
 Required environment:
   AI_GRID_GIT_TOKEN_FILE  Path to a file holding a fine-grained GitHub token
                           with contents: write on the catalog repository
-                          (ai-grid-cloud/ai-grid-shared-catalog) and nothing else.
+                          (rareddy/ai-grid-catalog) and nothing else.
 
 Optional environment:
   HUB_CONTEXT             Hub kubeconfig context.
