@@ -62,6 +62,13 @@ spec:
                             resource: scrapeconfigs
                             namespace: open-cluster-management-observability
                             name: ai-grid-dashboard-platform-metrics
+                          # The addon refuses to apply its manifests without an AddOnDeploymentConfig
+                          # reference, and when this policy creates the addon it has no default one.
+                          # The observability operator creates this config.
+                          - group: addon.open-cluster-management.io
+                            resource: addondeploymentconfigs
+                            namespace: open-cluster-management-observability
+                            name: multicluster-observability-addon
 ---
 apiVersion: policy.open-cluster-management.io/v1
 kind: PlacementBinding
