@@ -23,9 +23,10 @@
 #
 # Sync wave 4 runs after provisioning RBAC (wave 3) and before the spoke
 # Policy (wave 5), which needs this Secret to become Healthy. The Job waits
-# for the store Route if the Loki operator is still reconciling it; if the
-# Route takes longer than the wait, the Job fails and the Application's sync
-# retry runs a fresh Job (see hook-delete-policy).
+# for the store Route if the Loki operator is still reconciling it: 10 minutes
+# per pod, so up to about 30 minutes per Job with backoffLimit 2. If the Route
+# takes longer, the Job fails and the Application's sync retry runs a fresh Job
+# (see hook-delete-policy).
 apiVersion: batch/v1
 kind: Job
 metadata:
