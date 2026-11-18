@@ -52,6 +52,23 @@ wait_for_argocd() {
 }
 wait_for_argocd
 
+# Under ACM load the application controller can be OOM-killed before it syncs gitops-config, which is
+# what sets its memory. Apply the same controller resources here, read from that manifest so it stays
+# the one source of the values, before the root ApplicationSet starts the fan-out.
+patch_argocd_controller_resources() {
+  local manifest=apps/gitops-config/manifests/argocd.yaml resources
+  resources=$(KUBECONFIG=/dev/null oc label --local -f "$manifest" ai-grid.dev/read=true \
+    -o jsonpath='{.spec.controller.resources}')
+  if [ -z "$resources" ]; then
+    echo "ERROR: no spec.controller.resources in ${manifest}." >&2
+    return 1
+  fi
+  echo "Setting the Argo CD application controller's resources from ${manifest}..."
+  oc patch argocd openshift-gitops -n openshift-gitops --type merge \
+    -p "{\"spec\":{\"controller\":{\"resources\":${resources}}}}"
+}
+patch_argocd_controller_resources
+
 oc apply -f "bootstrap/${profile:+${profile}/}applicationset.yaml"
 oc apply -f bootstrap/openshift-gitops-admin.yaml
 oc patch consoles.operator.openshift.io cluster --patch '{ "spec": { "plugins": ["gitops-plugin"] } }' --type=merge
