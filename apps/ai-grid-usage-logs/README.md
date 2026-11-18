@@ -48,6 +48,11 @@ ServiceAccount from `manifests/30-rbac-provision-usage-logs-tokens.yaml`.
 Their RBAC is applied in wave 3, before the Jobs; the consuming Policy follows
 in wave 5. PostSync would deadlock the first sync because the Policy needs
 these Secrets to become Healthy.
+Both Jobs use `hook-delete-policy: HookSucceeded,BeforeHookCreation`. Argo CD
+names a hook once per sync operation and its retries reuse the name, so a
+failed Job (for example, the reader's when the store Route is not up within
+its 10-minute wait on a fresh hub) is deleted and run again on the next retry
+instead of failing every retry.
 ACM reads the Secrets with `fromSecret` and ships `$ocm_encrypted` ciphertext,
 so the tokens never appear in a managed cluster's manifest.
 
