@@ -46,6 +46,10 @@ spec:
                   name: multicluster-observability-addon
                 spec:
                   installStrategy:
+                    # If this policy creates the addon before the MultiClusterObservability exists,
+                    # the CRD default type Manual applies and nothing reverts it, so the addon (and
+                    # the Cluster Observability Operator it brings to the hub) is never installed.
+                    type: Placements
                     placements:
                       - name: global
                         namespace: open-cluster-management-global-set
