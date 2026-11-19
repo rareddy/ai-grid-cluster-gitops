@@ -3,7 +3,7 @@
 # generateName hook once per sync operation, and its automatic retries reuse that name, so without
 # BeforeHookCreation a failed Job stays and every retry reports it failed again: the app stays OutOfSync
 # even after the cause (such as the store Route arriving late) is gone.
-set -euo pipefail
+set -Eeuo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); fails=0; total=0
 ok() { total=$((total+1)); printf '   ok   %s\n' "$1"; }; bad() { total=$((total+1)); fails=$((fails+1)); printf '   FAIL %s: %s\n' "$1" "${2:-}"; }
 for f in "$HERE"/../manifests/*.yaml; do
