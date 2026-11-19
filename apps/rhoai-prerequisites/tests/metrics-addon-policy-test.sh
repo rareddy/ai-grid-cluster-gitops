@@ -2,7 +2,7 @@
 # The rhoai-metrics-addon Policy must leave the addon installable when it creates the ClusterManagementAddOn first:
 # installStrategy.type Placements (the CRD default is Manual) and, on the global placement, the reference to the
 # observability operator's AddOnDeploymentConfig.
-set -euo pipefail
+set -Eeuo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 python3 - "$HERE/../hub/13-rhai-metrics-addon-policy.yaml" <<'PY'
 import sys
