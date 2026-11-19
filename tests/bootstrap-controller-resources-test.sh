@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs bootstrap.sh against a stub oc (no cluster) and checks that it sets the Argo CD application
-# controller's resources from apps/gitops-config/manifests/argocd.yaml after the instance is Available
-# and before the root ApplicationSet is applied. The manifest is read with the real oc when one is on
+# controller's resources from apps/gitops-config/manifests/argocd.yaml after the instance is Available,
+# waits for the controller's StatefulSet to roll out with them, and only then applies the root ApplicationSet. The manifest is read with the real oc when one is on
 # PATH (oc label --local needs no cluster); otherwise the stub returns canned JSON.
 set -Eeuo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); ROOT="$HERE/.."
@@ -15,10 +15,16 @@ req=$(read_mem requests); lim=$(read_mem limits)
 
 cat > "$T/bin/oc" <<'END_STUB'
 #!/usr/bin/env bash
-# Logs each call; answers the Argo CD phase wait; STUB_PATCH_RC fails the controller patch.
+# Logs each call; answers the Argo CD phase wait; STUB_PATCH_RC fails the controller patch;
+# STUB_STS_LIMIT is the controller StatefulSet's memory limit; STUB_ROLLOUT_RC fails its rollout status.
 printf '%s\n' "$*" >> "$STUB_LOG"
 case "$*" in
   *"get argocd openshift-gitops"*) printf Available ;;
+  *"get statefulset openshift-gitops-application-controller"*) printf '%s' "${STUB_STS_LIMIT:-}" ;;
+  *"rollout status statefulset/openshift-gitops-application-controller"*) exit "${STUB_ROLLOUT_RC:-0}" ;;
+  "label --local"*"limits.memory"*)
+    if [ -n "${REAL_OC:-}" ]; then exec "$REAL_OC" "$@"; fi
+    grep -q 'controller:' "$4" && printf '%s' "${STUB_LIMIT:-}" ;;
   "label --local"*)
     if [ -n "${REAL_OC:-}" ]; then exec "$REAL_OC" "$@"; fi
     grep -q 'controller:' "$4" && printf '%s' "${STUB_RESOURCES:-}" ;;
@@ -39,6 +45,7 @@ run() { # dir log [ENV=VAL ...]
   local dir=$1 log=$2; shift 2; : > "$log"
   (cd "$dir" && env -i PATH="$T/bin:/usr/bin:/bin" REAL_OC="$REAL_OC" STUB_LOG="$log" \
     STUB_RESOURCES="{\"limits\":{\"memory\":\"$lim\"},\"requests\":{\"memory\":\"$req\"}}" \
+    STUB_LIMIT="$lim" STUB_STS_LIMIT="$lim" \
     "$@" bash bootstrap.sh >/dev/null 2>&1)
 }
 line_of() { grep -n -m1 -e "$2" "$1" | cut -d: -f1; }
@@ -47,10 +54,12 @@ check() { # name condition...
   if "$@"; then printf '   ok   %s\n' "$name"; else printf '   FAIL %s\n' "$name"; fails=$((fails+1)); fi
 }
 ordered() { # log root
-  local ready patch root
+  local ready patch wait root
   ready=$(line_of "$1" 'get argocd openshift-gitops'); patch=$(line_of "$1" '^patch argocd openshift-gitops')
+  wait=$(line_of "$1" 'rollout status statefulset/openshift-gitops-application-controller')
   root=$(line_of "$1" "^apply -f $2\$")
-  [ -n "$ready" ] && [ -n "$patch" ] && [ -n "$root" ] && [ "$ready" -lt "$patch" ] && [ "$patch" -lt "$root" ]
+  [ -n "$ready" ] && [ -n "$patch" ] && [ -n "$wait" ] && [ -n "$root" ] &&
+    [ "$ready" -lt "$patch" ] && [ "$patch" -lt "$wait" ] && [ "$wait" -lt "$root" ]
 }
 payload_ok() { # log
   local p; p=$(grep -m1 '^patch argocd openshift-gitops' "$1")
@@ -64,13 +73,13 @@ no_root() { ! grep -q 'applicationset.yaml' "$1"; }
 setup "$T/default" "$manifest"
 run "$T/default" "$T/default.log" && rc=0 || rc=$?
 check "default: bootstrap succeeds" [ "$rc" -eq 0 ]
-check "default: Available, then patch, then root" ordered "$T/default.log" bootstrap/applicationset.yaml
+check "default: Available, then patch, then rollout wait, then root" ordered "$T/default.log" bootstrap/applicationset.yaml
 check "default: patch carries argocd.yaml's requests $req, limits $lim" payload_ok "$T/default.log"
 
 setup "$T/hub" "$manifest"
 run "$T/hub" "$T/hub.log" BOOTSTRAP_PROFILE=dedicated-hub && rc=0 || rc=$?
 check "dedicated-hub: bootstrap succeeds" [ "$rc" -eq 0 ]
-check "dedicated-hub: Available, then patch, then root" ordered "$T/hub.log" bootstrap/dedicated-hub/applicationset.yaml
+check "dedicated-hub: Available, then patch, then rollout wait, then root" ordered "$T/hub.log" bootstrap/dedicated-hub/applicationset.yaml
 check "dedicated-hub: patch carries argocd.yaml's values" payload_ok "$T/hub.log"
 
 printf 'apiVersion: argoproj.io/v1beta1\nkind: ArgoCD\nmetadata:\n  name: openshift-gitops\nspec: {}\n' > "$T/empty.yaml"
@@ -83,5 +92,15 @@ setup "$T/patchfail" "$manifest"
 run "$T/patchfail" "$T/patchfail.log" STUB_PATCH_RC=1 && rc=0 || rc=$?
 check "patch fails: bootstrap fails" [ "$rc" -ne 0 ]
 check "patch fails: root not applied" no_root "$T/patchfail.log"
+
+setup "$T/stale" "$manifest"
+run "$T/stale" "$T/stale.log" STUB_STS_LIMIT=1Gi ARGOCD_CONTROLLER_TIMEOUT_SECONDS=2 ARGOCD_POLL_SECONDS=1 && rc=0 || rc=$?
+check "controller never gets the limit: bootstrap fails" [ "$rc" -ne 0 ]
+check "controller never gets the limit: root not applied" no_root "$T/stale.log"
+
+setup "$T/rolloutfail" "$manifest"
+run "$T/rolloutfail" "$T/rolloutfail.log" STUB_ROLLOUT_RC=1 && rc=0 || rc=$?
+check "rollout wait fails: bootstrap fails" [ "$rc" -ne 0 ]
+check "rollout wait fails: root not applied" no_root "$T/rolloutfail.log"
 
 echo "bootstrap-controller-resources tests: $((total-fails)) ok, $fails failed"; exit "$fails"
